@@ -185,21 +185,35 @@ def validate(model, val_loader, criterion, device):
             })
     return running_loss/len(val_loader), correct/total
 
+def count_parameters(model):
+    """Count number of trainable parameters in the model."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 def main():
     """Main training function."""
     # Set random seeds for reproducibility
     seed_everything(42)
+    
     # Create models directory if it doesn't exist
     os.makedirs('models', exist_ok=True)
+    
+    # Create model, criterion, and optimizer
+    model = ImageClassifier().to(CONFIG['DEVICE'])
+    
+    # Print number of trainable parameters
+    num_params = count_parameters(model)
+    print(f"Number of trainable parameters: {num_params:,}")
+    
     # Memory optimization for CUDA
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-        # Set memory allocation to 'empty_cache'
         torch.backends.cudnn.benchmark = True
         os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
+    
     # Create data loaders
     train_transform = get_transforms(is_train=True)
     val_transform = get_transforms(is_train=False)
+    
     train_dataset = ImageDataset(
         os.path.join(CONFIG['DATA_DIR'], 'train'),
         transform=train_transform
@@ -208,6 +222,7 @@ def main():
         os.path.join(CONFIG['DATA_DIR'], 'val'),
         transform=val_transform
     )
+    
     train_loader = DataLoader(
         train_dataset,
         batch_size=CONFIG['BATCH_SIZE'],
@@ -222,6 +237,7 @@ def main():
         num_workers=CONFIG['NUM_WORKERS'],
         pin_memory=True
     )
+    
     # Create model, criterion, and optimizer
     model = ImageClassifier().to(CONFIG['DEVICE'])
     criterion = nn.CrossEntropyLoss()
@@ -230,28 +246,38 @@ def main():
         lr=CONFIG['LEARNING_RATE'],
         weight_decay=CONFIG['WEIGHT_DECAY']
     )
-    scheduler = optim.lr_scheduler.OneCycleLR(
+    
+    # Use CosineAnnealingWarmRestarts scheduler
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer,
-        max_lr=CONFIG['LEARNING_RATE'],
-        epochs=CONFIG['NUM_EPOCHS'],
-        steps_per_epoch=len(train_loader),
-        pct_start=0.1
+        T_0=10,  # First restart at epoch 10
+        T_mult=2,  # Double the restart interval after each restart
+        eta_min=CONFIG['LEARNING_RATE'] * 0.01  # Minimum learning rate
     )
+    
     # Training loop
     best_val_acc = 0.0
     for epoch in range(CONFIG['NUM_EPOCHS']):
         print(f'\nEpoch {epoch+1}/{CONFIG["NUM_EPOCHS"]}')
+        print(f'Learning Rate: {scheduler.get_last_lr()[0]:.6f}')
+        
         # Train
         train_loss, train_acc = train_epoch(
             model, train_loader, criterion, optimizer, CONFIG['DEVICE']
         )
+        
+        # Step the scheduler after each epoch
+        scheduler.step()
+        
         # Clear cache after training epoch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        
         # Validate
         val_loss, val_acc = validate(
             model, val_loader, criterion, CONFIG['DEVICE']
         )
+        
         # Save current epoch model
         torch.save({
             'epoch': epoch,
@@ -263,6 +289,7 @@ def main():
             'val_loss': val_loss,
             'val_acc': val_acc,
         }, f'models/{CONFIG["MODEL_NAME"]}_epoch_{epoch+1}.pth')
+        
         # Save best model
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -272,14 +299,15 @@ def main():
                 'optimizer_state_dict': optimizer.state_dict(),
                 'scheduler_state_dict': scheduler.state_dict(),
                 'best_val_acc': best_val_acc,
-            }, 'models/best_model.pth')
+            }, f'models/{CONFIG["MODEL_NAME"]}_best_model.pth')
+        
         print(f'Train Loss: {train_loss:.4f} | Train Acc: {train_acc*100:.2f}%')
         print(f'Val Loss: {val_loss:.4f} | Val Acc: {val_acc*100:.2f}%')
         print(f'Best Val Acc: {best_val_acc*100:.2f}%')
-        print(f'Model saved: models/epoch_{epoch+1}.pth')
+        print(f'Model saved: models/{CONFIG["MODEL_NAME"]}_epoch_{epoch+1}.pth')
         if val_acc == best_val_acc:
-            print('New best model saved!')
-        scheduler.step()
+            print(f'New best model saved: models/{CONFIG["MODEL_NAME"]}_best_model.pth!')
+        
         # Clear cache after validation
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
