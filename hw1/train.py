@@ -15,7 +15,7 @@ import torchvision
 
 # Configuration
 CONFIG = {
-    'MODEL_NAME': 'resnet101',
+    'MODEL_NAME': 'resnet50',
     'NUM_CLASSES': 100,
     'DROPOUT_RATE': 0.3,
     'BATCH_SIZE': 16, 
@@ -40,7 +40,8 @@ CONFIG = {
             'TRANSLATE': (0.1, 0.1),
             'SCALE': (0.9, 1.1)
         }
-    }
+    },
+    'MAX_MODEL_SIZE_MB': 100
 }
 
 def seed_everything(seed=42):
@@ -125,11 +126,11 @@ def get_transforms(is_train=True):
         ])
 
 class ImageClassifier(nn.Module):
-    """Image classification model using ResNet101."""
+    """Image classification model using ResNet50."""
     def __init__(self, model_name=CONFIG['MODEL_NAME'], num_classes=CONFIG['NUM_CLASSES']):
         super().__init__()
-        # Load pre-trained ResNet101 with updated weights parameter
-        self.model = torchvision.models.resnet101(weights=torchvision.models.ResNet101_Weights.DEFAULT)
+        # Load pre-trained ResNet50
+        self.model = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.DEFAULT)
         # Modify the final layer for our number of classes
         num_features = self.model.fc.in_features
         self.model.fc = nn.Sequential(
@@ -189,6 +190,17 @@ def count_parameters(model):
     """Count number of trainable parameters in the model."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+def get_model_size(model):
+    """Get model size in MB."""
+    param_size = 0
+    for param in model.parameters():
+        param_size += param.nelement() * param.element_size()
+    buffer_size = 0
+    for buffer in model.buffers():
+        buffer_size += buffer.nelement() * buffer.element_size()
+    size_all_mb = (param_size + buffer_size) / 1024**2
+    return size_all_mb
+
 def main():
     """Main training function."""
     # Set random seeds for reproducibility
@@ -200,9 +212,15 @@ def main():
     # Create model, criterion, and optimizer
     model = ImageClassifier().to(CONFIG['DEVICE'])
     
-    # Print number of trainable parameters
+    # Print number of trainable parameters and model size
     num_params = count_parameters(model)
+    model_size = get_model_size(model)
     print(f"Number of trainable parameters: {num_params:,}")
+    print(f"Model size: {model_size:.2f} MB")
+    
+    # Check if model size exceeds the maximum allowed size
+    if model_size > CONFIG['MAX_MODEL_SIZE_MB']:
+        raise ValueError(f"Model size ({model_size:.2f} MB) exceeds the maximum allowed size ({CONFIG['MAX_MODEL_SIZE_MB']} MB)")
     
     # Memory optimization for CUDA
     if torch.cuda.is_available():
