@@ -143,12 +143,12 @@ The final model selection criteria focused on optimal performance-efficiency tra
 ## Implementation Details
 
 ### Code Architecture
-- `train.py`: Core training implementation
+- [train.py](https://github.com/dytsou/vrdl2025/blob/master/hw1/train.py): Core training implementation
   - Modular architecture design
   - Comprehensive data augmentation pipeline
   - Optimized training loop
   - Memory management system
-- `predict.py`: Inference implementation
+- [predict.py](https://github.com/dytsou/vrdl2025/blob/master/hw1/predict.py): Inference implementation
   - Order-preserving prediction system
   - Batch-optimized processing
   - Robust error handling
