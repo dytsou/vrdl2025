@@ -19,7 +19,7 @@ CONFIG = {
     'NUM_CLASSES': 100,
     'DROPOUT_RATE': 0.3,
     'BATCH_SIZE': 16, 
-    'NUM_EPOCHS': 70,
+    'NUM_EPOCHS': 50,
     'LEARNING_RATE': 1e-3,
     'WEIGHT_DECAY': 1e-4,
     'NUM_WORKERS': 4,
@@ -41,7 +41,14 @@ CONFIG = {
             'SCALE': (0.9, 1.1)
         }
     },
-    'MAX_MODEL_SIZE_MB': 100
+    'MAX_MODEL_SIZE_MB': 100,
+    # New configurations for enhanced training
+    'USE_FOCAL_LOSS': True,
+    'FOCAL_LOSS_GAMMA': 2.0,
+    'USE_CBAM': True,
+    'USE_ENSEMBLE': False,  # Keep ensemble disabled to reduce model size
+    'CBAM_REDUCTION_RATIO': 128,  # Further increased reduction ratio for ResNet50
+    'USE_SIMPLIFIED_CBAM': True  # Keep simplified CBAM
 }
 
 def seed_everything(seed=42):
@@ -125,19 +132,162 @@ def get_transforms(is_train=True):
                               std=[0.229, 0.224, 0.225])
         ])
 
+class FocalLoss(nn.Module):
+    """Focal Loss for handling class imbalance."""
+    def __init__(self, gamma=2.0):
+        super().__init__()
+        self.gamma = gamma
+
+    def forward(self, inputs, targets):
+        ce_loss = nn.CrossEntropyLoss(reduction='none')(inputs, targets)
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma * ce_loss).mean()
+        return focal_loss
+
+class ChannelAttention(nn.Module):
+    """Channel Attention Module with reduced parameters."""
+    def __init__(self, in_channels, reduction_ratio=32):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channels, in_channels // reduction_ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_channels // reduction_ratio, in_channels, bias=False)
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x).view(x.size(0), -1))
+        max_out = self.fc(self.max_pool(x).view(x.size(0), -1))
+        out = avg_out + max_out
+        return self.sigmoid(out).view(x.size(0), x.size(1), 1, 1)
+
+class SpatialAttention(nn.Module):
+    """Spatial Attention Module."""
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=kernel_size//2)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv(x)
+        return self.sigmoid(x)
+
+class CBAM(nn.Module):
+    """Convolutional Block Attention Module."""
+    def __init__(self, in_channels, reduction_ratio=32, kernel_size=7):
+        super().__init__()
+        self.channel_attention = ChannelAttention(in_channels, reduction_ratio)
+        self.spatial_attention = SpatialAttention(kernel_size)
+
+    def forward(self, x):
+        x = x * self.channel_attention(x)
+        x = x * self.spatial_attention(x)
+        return x
+
+class SimplifiedChannelAttention(nn.Module):
+    """Simplified Channel Attention Module with minimal parameters."""
+    def __init__(self, in_channels, reduction_ratio=64):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(in_channels, in_channels // reduction_ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_channels // reduction_ratio, in_channels, bias=False)
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        out = self.fc(self.avg_pool(x).view(x.size(0), -1))
+        return self.sigmoid(out).view(x.size(0), x.size(1), 1, 1)
+
+class SimplifiedSpatialAttention(nn.Module):
+    """Simplified Spatial Attention Module with minimal parameters."""
+    def __init__(self, kernel_size=3):  # Reduced kernel size
+        super().__init__()
+        self.conv = nn.Conv2d(1, 1, kernel_size=kernel_size, padding=kernel_size//2)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        x = self.conv(avg_out)
+        return self.sigmoid(x)
+
+class SimplifiedCBAM(nn.Module):
+    """Simplified CBAM with reduced parameters."""
+    def __init__(self, in_channels, reduction_ratio=64, kernel_size=3):
+        super().__init__()
+        self.channel_attention = SimplifiedChannelAttention(in_channels, reduction_ratio)
+        self.spatial_attention = SimplifiedSpatialAttention(kernel_size)
+
+    def forward(self, x):
+        x = x * self.channel_attention(x)
+        x = x * self.spatial_attention(x)
+        return x
+
 class ImageClassifier(nn.Module):
-    """Image classification model using ResNet50."""
+    """Image classification model using ResNet50 with optional simplified CBAM."""
     def __init__(self, model_name=CONFIG['MODEL_NAME'], num_classes=CONFIG['NUM_CLASSES']):
         super().__init__()
         # Load pre-trained ResNet50
         self.model = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.DEFAULT)
+        
+        # Add CBAM if enabled
+        if CONFIG['USE_CBAM']:
+            if CONFIG['USE_SIMPLIFIED_CBAM']:
+                # Apply CBAM after each bottleneck block
+                self.cbam1 = SimplifiedCBAM(256, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam2 = SimplifiedCBAM(512, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam3 = SimplifiedCBAM(1024, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam4 = SimplifiedCBAM(2048, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+            else:
+                self.cbam1 = CBAM(256, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam2 = CBAM(512, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam3 = CBAM(1024, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+                self.cbam4 = CBAM(2048, reduction_ratio=CONFIG['CBAM_REDUCTION_RATIO'])
+            
+            # Modify forward pass to include CBAM
+            self.original_forward = self.model.forward
+            self.model.forward = self.forward_with_cbam
+        
         # Modify the final layer for our number of classes
         num_features = self.model.fc.in_features
         self.model.fc = nn.Sequential(
             nn.Dropout(CONFIG['DROPOUT_RATE']),
             nn.Linear(num_features, num_classes)
         )
+
+    def forward_with_cbam(self, x):
+        x = self.model.conv1(x)
+        x = self.model.bn1(x)
+        x = self.model.relu(x)
+        x = self.model.maxpool(x)
+        
+        # Apply CBAM after each bottleneck block
+        x = self.model.layer1(x)
+        x = self.cbam1(x)
+        
+        x = self.model.layer2(x)
+        x = self.cbam2(x)
+        
+        x = self.model.layer3(x)
+        x = self.cbam3(x)
+        
+        x = self.model.layer4(x)
+        x = self.cbam4(x)
+        
+        x = self.model.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.model.fc(x)
+        return x
+
     def forward(self, x):
+        if CONFIG['USE_CBAM']:
+            return self.forward_with_cbam(x)
         return self.model(x)
 
 def train_epoch(model, train_loader, criterion, optimizer, device):
@@ -209,7 +359,7 @@ def main():
     # Create models directory if it doesn't exist
     os.makedirs('models', exist_ok=True)
     
-    # Create model, criterion, and optimizer
+    # Create single model (ensemble disabled)
     model = ImageClassifier().to(CONFIG['DEVICE'])
     
     # Print number of trainable parameters and model size
@@ -256,9 +406,13 @@ def main():
         pin_memory=True
     )
     
-    # Create model, criterion, and optimizer
-    model = ImageClassifier().to(CONFIG['DEVICE'])
-    criterion = nn.CrossEntropyLoss()
+    # Create criterion based on configuration
+    if CONFIG['USE_FOCAL_LOSS']:
+        criterion = FocalLoss(gamma=CONFIG['FOCAL_LOSS_GAMMA'])
+    else:
+        criterion = nn.CrossEntropyLoss()
+    
+    # Create optimizer
     optimizer = optim.AdamW(
         model.parameters(),
         lr=CONFIG['LEARNING_RATE'],

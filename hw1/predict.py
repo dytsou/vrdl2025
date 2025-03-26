@@ -27,7 +27,7 @@ def predict():
     )
     # Load model
     model = ImageClassifier().to(CONFIG['DEVICE'])
-    checkpoint = torch.load('models/best_model.pth')
+    checkpoint = torch.load('models/resnet50_best_model.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     # Create a dictionary to store predictions
