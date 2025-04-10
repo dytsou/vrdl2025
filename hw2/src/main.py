@@ -104,7 +104,9 @@ def main():
     logger.info("Starting digit recognition system")
     # Check if CUDA is available
     logger.info("Using device: %s", device)
-    model = get_improved_faster_rcnn_model(args.num_classes)
+    model = get_improved_faster_rcnn_model(
+        num_classes=args.num_classes
+    )
     logger.info("Using improved Faster R-CNN model")
     model.to(device)
     # Load checkpoint if provided
