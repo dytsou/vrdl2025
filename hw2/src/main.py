@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 import config
 from data_preprocessing import get_data_loaders
-from model import get_faster_rcnn_model, get_improved_faster_rcnn_model
+from model import get_improved_faster_rcnn_model
 from train import train_model
 from inference import TestDataset
 from inference import inference, recognize_numbers, save_predictions
@@ -65,8 +65,6 @@ def main():
                         help='Momentum')
     parser.add_argument('--weight_decay', type=float, default=config.WEIGHT_DECAY,
                         help='Weight decay')
-    parser.add_argument('--improved_model', action='store_true', default=config.USE_IMPROVED_MODEL,
-                        help='Use improved model')
     parser.add_argument('--mode', type=str, choices=['train', 'test', 'both'], default='both',
                         help='Mode')
     parser.add_argument('--checkpoint', type=str, default=None,
@@ -93,7 +91,9 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
     # Set up logging to file
-    log_file = os.path.join(args.log_dir, f"log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_filename = f"log_{timestamp}.log"
+    log_file = os.path.join(args.log_dir, log_filename)
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
@@ -104,13 +104,8 @@ def main():
     logger.info("Starting digit recognition system")
     # Check if CUDA is available
     logger.info("Using device: %s", device)
-    # Use improved model or not
-    if args.improved_model:
-        model = get_improved_faster_rcnn_model(args.num_classes)
-        logger.info("Using improved Faster R-CNN model")
-    else:
-        model = get_faster_rcnn_model(args.num_classes)
-        logger.info("Using standard Faster R-CNN model")
+    model = get_improved_faster_rcnn_model(args.num_classes)
+    logger.info("Using improved Faster R-CNN model")
     model.to(device)
     # Load checkpoint if provided
     if args.checkpoint:

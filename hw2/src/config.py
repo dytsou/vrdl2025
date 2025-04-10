@@ -21,7 +21,6 @@ LOG_DIR = 'logs'
 
 # Model Arguments
 NUM_CLASSES = 11  # 10 classes + 1 for background
-USE_IMPROVED_MODEL = True  # Use improved model or not
 
 # Training Parameters
 BATCH_SIZE = 2
