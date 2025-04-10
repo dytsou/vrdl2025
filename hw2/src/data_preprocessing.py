@@ -34,6 +34,15 @@ class DigitDataset(Dataset):
         is_train (bool): If True, the dataset is used for training.
     """
     def __init__(self, data_dir, annotation_file, transform=None, is_train=True):
+        """
+        Custom dataset for loading digit images and annotations in COCO format.
+        Args:
+            data_dir (str): Directory containing the images.
+            annotation_file (str): Path to the COCO annotation file.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+            is_train (bool): If True, the dataset is used for training.
+        """
         self.data_dir = data_dir
         self.transform = transform
         self.is_train = is_train
@@ -41,12 +50,13 @@ class DigitDataset(Dataset):
         self.coco = COCO(annotation_file)
         self.image_ids = list(sorted(self.coco.imgs.keys()))
         # Get image ids
-        self.categories = {cat['id']: cat['name'] for cat in self.coco.loadCats(self.coco.getCatIds())}
-        
+        self.categories = {
+            cat['id']: cat['name']
+            for cat in self.coco.loadCats(self.coco.getCatIds())
+        }
     def __len__(self):
         """Return the number of images in the dataset."""
         return len(self.image_ids)
-    
     def __getitem__(self, idx):
         """Load an image and its annotations."""
         # Get image id

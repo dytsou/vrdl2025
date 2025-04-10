@@ -32,7 +32,7 @@ def get_improved_faster_rcnn_model(num_classes=config.NUM_CLASSES):
             Default is the number of classes from config.
     Returns:
         model (torchvision.models.detection.FasterRCNN): The improved Faster R-CNN model.
-    """ 
+    """
     # Load the pre-trained Faster R-CNN model
     model = torchvision.models.detection.fasterrcnn_resnet50_fpn(weights="DEFAULT")
     # Get the number of input features for the classifier

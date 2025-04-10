@@ -21,7 +21,7 @@ The script includes the following functionalities:
   applying transformations, and converting predictions to the required format.
 - The script is modular and can be easily integrated into a larger
   pipeline for digit recognition tasks.
-"""    
+"""
 import os
 import json
 import torch
@@ -30,6 +30,13 @@ from torch.utils.data import Dataset
 import config
 
 class TestDataset(Dataset):
+    """
+    Custom dataset for loading test images.
+    Args:
+        data_dir (str): Directory containing the test images.
+        transform (callable, optional): Optional transform to be applied
+            on a sample.
+    """
     def __init__(self, data_dir, transform=None):
         """
         Custom dataset for loading test images.
@@ -40,7 +47,10 @@ class TestDataset(Dataset):
         """
         self.data_dir = data_dir
         self.transform = transform
-        self.image_files = sorted([f for f in os.listdir(data_dir) if f.endswith('.jpg') or f.endswith('.png')])
+        self.image_files = sorted([
+            f for f in os.listdir(data_dir)
+            if f.endswith('.jpg') or f.endswith('.png')
+        ])
     def __len__(self):
         """Return the number of images in the dataset."""
         return len(self.image_files)
@@ -79,7 +89,7 @@ def inference(model, test_loader, device=None, score_threshold=None):
         device = torch.device(config.DEVICE)
     if score_threshold is None:
         score_threshold = config.SCORE_THRESHOLD
-    # Set the model to evaluation mode 
+    # Set the model to evaluation mode
     model.eval()
     predictions = []
     image_ids = []
@@ -106,7 +116,7 @@ def inference(model, test_loader, device=None, score_threshold=None):
                     width = x_max - x_min
                     height = y_max - y_min
                     coco_boxes.append([
-                        float(x_min), 
+                        float(x_min),
                         float(y_min),
                         float(width),
                         float(height)
@@ -138,7 +148,6 @@ def recognize_numbers(predictions, image_ids):
         if image_id not in predictions_by_image:
             predictions_by_image[image_id] = []
         predictions_by_image[image_id].append(pred)
-    
     # Recognize numbers
     number_predictions = []
     for image_id in image_ids:

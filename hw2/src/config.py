@@ -49,7 +49,7 @@ BLUR_PROB = 0.5  # Probability of applying Gaussian blur
 BLUR_KERNEL_SIZE = 5  # Kernel size for Gaussian blur
 BLUR_SIGMA = 1.0  # Sigma for Gaussian blur
 # Probability of changing brightness and contrast
-RANDOM_BRIGHTNESS_CONTRAST_PROB = 0.5  
+RANDOM_BRIGHTNESS_CONTRAST_PROB = 0.5
 
 # RPN Parameters for Anchor Generation
 ANCHOR_SIZES = ((16,), (32,), (64,), (128,), (256,))
