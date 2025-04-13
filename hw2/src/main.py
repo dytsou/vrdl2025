@@ -90,6 +90,7 @@ def main():
     # Create output directories
     os.makedirs(args.output_dir, exist_ok=True)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
+    os.makedirs(args.log_dir, exist_ok=True)
     # Set up logging to file
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_filename = f"log_{timestamp}.log"
@@ -125,7 +126,8 @@ def main():
             args.val_dir,
             args.train_annotation,
             args.val_annotation,
-            args.batch_size
+            args.batch_size,
+            num_workers=args.num_workers
         )
         # Define optimizer
         optimizer = torch.optim.SGD(
@@ -147,7 +149,14 @@ def main():
         )
     # Test mode
     if args.mode in ['test', 'both']:
-        # Load the best model
+        # Load the best model for testing
+        best_model_path = os.path.join(args.checkpoint_dir, 'best_model.pth')
+        if os.path.exists(best_model_path):
+            model.load_state_dict(torch.load(best_model_path, map_location=device))
+            logger.info("Loaded best model for testing from %s", best_model_path)
+        else:
+            logger.warning("Best model not found at %s, using current model", best_model_path)
+            
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=config.NORMALIZE_MEAN, std=config.NORMALIZE_STD)
@@ -157,6 +166,7 @@ def main():
             test_dataset,
             batch_size=args.batch_size,
             shuffle=False,
+            num_workers=args.num_workers,
             collate_fn=lambda batch: tuple(zip(*batch))
         )
         # Predict on test data

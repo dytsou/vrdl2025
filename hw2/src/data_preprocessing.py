@@ -94,7 +94,8 @@ def get_data_loaders(
         val_dir=config.VAL_DIR,
         train_annotation=config.TRAIN_ANNOTATION,
         val_annotation=config.VAL_ANNOTATION,
-        batch_size=None
+        batch_size=config.BATCH_SIZE,
+        num_workers=config.NUM_WORKERS
     ):
     """
     Get data loaders for training and validation datasets.
@@ -104,6 +105,7 @@ def get_data_loaders(
         train_annotation (str): Path to training annotation file.
         val_annotation (str): Path to validation annotation file.
         batch_size (int, optional): Batch size for data loaders.
+        num_workers (int, optional): Number of workers for data loading.
     Returns:
         train_loader (DataLoader): Data loader for training dataset.
         val_loader (DataLoader): Data loader for validation dataset.
@@ -135,12 +137,16 @@ def get_data_loaders(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True if config.DEVICE == 'cuda' else False,
         collate_fn=collate_fn
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True if config.DEVICE == 'cuda' else False,
         collate_fn=collate_fn
     )
     return train_loader, val_loader
