@@ -21,13 +21,22 @@ def get_transform(train=True):
             A.HorizontalFlip(p=config.FLIP_PROB),
             A.Rotate(limit=config.ROTATE_ANGLE, p=config.ROTATE_ANGLE_PROB),
             A.RandomScale(scale_limit=config.SCALE, p=config.SCALE_PROB),
-            A.ShiftScaleRotate(scale_limit=0.1, rotate_limit=15, shift_limit=0.1, p=config.SHIFT_SCALE_ROTATE_PROB),
+            A.ShiftScaleRotate(
+                scale_limit=config.SHIFT_SCALE_LIMIT, 
+                rotate_limit=config.SHIFT_ROTATE_LIMIT, 
+                shift_limit=config.SHIFT_LIMIT, 
+                p=config.SHIFT_SCALE_ROTATE_PROB
+            ),
             A.GridDistortion(p=config.GRID_DISTORTION_PROB),
             A.GaussianBlur(blur_limit=config.BLUR_KERNEL_SIZE, p=config.BLUR_PROB),
             A.HueSaturationValue(hue_shift_limit=config.HUE_DELTA*255, p=config.HUE_PROB),
             A.Normalize(config.NORMALIZE_MEAN, config.NORMALIZE_STD),
             ToTensorV2()
-        ], bbox_params=A.BboxParams(format='coco', label_fields=['labels'], min_visibility=0.3))
+        ], bbox_params=A.BboxParams(
+            format='coco', 
+            label_fields=['labels'], 
+            min_visibility=config.BBOX_PARAMS_MIN_VISIBILITY
+        ))
     else:
         return A.Compose([
             A.Resize(height=config.IMG_HEIGHT, width=config.IMG_WIDTH),

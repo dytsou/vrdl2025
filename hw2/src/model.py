@@ -26,12 +26,12 @@ def get_improved_faster_rcnn_model(num_classes=config.NUM_CLASSES):
     model.rpn.anchor_generator.sizes = config.ANCHOR_SIZES
     model.rpn.anchor_generator.aspect_ratios = config.ANCHOR_RATIOS
     # Set NMS threshold
-    model.roi_heads.nms_thresh = 0.4  # Default is 0.5, lower value reduces overlapping boxes
+    model.roi_heads.nms_thresh = config.ROI_NMS_THRESH
     # Set detection threshold
-    model.roi_heads.score_thresh = 0.05  # Set a lower threshold for inference
+    model.roi_heads.score_thresh = config.ROI_SCORE_THRESH
     # Set RPN NMS threshold
-    model.rpn.nms_thresh = 0.6  # Default is 0.7
+    model.rpn.nms_thresh = config.RPN_NMS_THRESH
     # Set RPN foreground and background thresholds
-    model.rpn.fg_iou_thresh = 0.6  # Default is 0.7
-    model.rpn.bg_iou_thresh = 0.4  # Default is 0.3   
+    model.rpn.fg_iou_thresh = config.RPN_FG_IOU_THRESH
+    model.rpn.bg_iou_thresh = config.RPN_BG_IOU_THRESH
     return model
