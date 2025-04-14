@@ -93,29 +93,50 @@ def train_model(
         save_dir = config.CHECKPOINT_DIR
     # Create save directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
+    # Set learning rate scheduler
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, 
+        step_size=config.LR_SCHEDULER_STEP_SIZE, 
+        gamma=config.LR_SCHEDULER_GAMMA
+    )
+    # Early stopping parameters
+    patience = config.PATIENCE
+    min_delta = config.MIN_DELTA
+    patience_counter = 0
     # Record training and validation losses
     train_losses = []
     val_losses = []
     best_val_loss = float('inf')
     for epoch in range(num_epochs):
         logger.info("Epoch %d/%d", epoch + 1, num_epochs)
+        logger.info("Learning Rate: %.6f", optimizer.param_groups[0]['lr'])
         # Training
         train_loss = train_one_epoch(model, optimizer, train_loader, device)
         train_losses.append(train_loss)
         # Validation
         val_loss = evaluate(model, val_loader, device, logger)
         val_losses.append(val_loss)
+        # Update learning rate
+        scheduler.step()
         logger.info("Train Loss: %.4f, Val Loss: %.4f", train_loss, val_loss)
         # Save the best model
-        if val_loss < best_val_loss:
+        if val_loss < best_val_loss - min_delta:    
             best_val_loss = val_loss
             torch.save(model.state_dict(), os.path.join(save_dir, 'best_model.pth'))
             logger.info("Saved best model!")
+            patience_counter = 0
+        else:
+            patience_counter += 1
+        # Early stopping
+        if patience_counter >= patience:
+            logger.info("Early stopping triggered after %d epochs without improvement", patience)
+            break
         # Save checkpoint
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
             'train_loss': train_loss,
             'val_loss': val_loss,
         }, os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}.pth'))
