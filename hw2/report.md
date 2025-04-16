@@ -92,7 +92,7 @@ The model achieves competitive results on the evaluation metrics:
 #### 3.2.1 Training and Validation Curves
 The model's training process can be visualized through the training and validation loss curves. These curves provide insight into the model's learning behavior and convergence.
 
-![Figure 1: Training and Validation Loss Curves over 30 epochs. The graph shows a consistent decrease in training loss and stabilization of validation loss around epoch 20, indicating good convergence without significant overfitting.](results/loss_curve.png)
+![Figure 1: Training and Validation Loss Curves over 30 epochs. The graph shows a consistent decrease in training loss and stabilization of validation loss around epoch 20, indicating good convergence without significant overfitting.](results/visualizations/loss_curve.png)
 
 In addition to loss, we tracked the mean Average Precision (mAP) on the validation set throughout training:
 
