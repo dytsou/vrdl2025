@@ -27,13 +27,12 @@ import json
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-import config
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patches as patches
-from visualizations import visualize_detections, visualize_failure_cases
+import config
 
 class TestDataset(Dataset):
     """
@@ -204,60 +203,46 @@ def visualize_test_predictions(model, test_loader, device, output_dir, num_sampl
     """
     # Create directory for visualization
     vis_dir = os.path.join(output_dir, 'test_visualizations')
-    os.makedirs(vis_dir, exist_ok=True)
-    
+    os.makedirs(vis_dir, exist_ok=True)    
     model.eval()
     count = 0
-    
     # Set up color map for different classes (excluding background)
     colors = cm.get_cmap('hsv')(np.linspace(0, 1, config.NUM_CLASSES - 1))
     colors = (colors[:, :3] * 255).astype(int)
-    
     with torch.no_grad():
         for images, image_ids in tqdm(test_loader, desc="Visualizing test predictions"):
             if count >= num_samples:
                 break
-                
             images = [img.to(device) for img in images]
             predictions = model(images)
-            
-            for i, (image, image_id, prediction) in enumerate(zip(images, image_ids, predictions)):
+            for (image, image_id, prediction) in zip(images, image_ids, predictions):
                 if count >= num_samples:
                     break
-                
                 # Convert image from tensor to numpy for visualization
                 image_np = image.cpu().permute(1, 2, 0).numpy()
-                
                 # Un-normalize the image
                 image_np = image_np * np.array(config.NORMALIZE_STD) + np.array(config.NORMALIZE_MEAN)
                 image_np = np.clip(image_np, 0, 1)
-                
                 # Create figure for plotting
                 fig, ax = plt.subplots(1, figsize=(10, 8))
                 ax.imshow(image_np)
-                
                 # Get predictions
                 boxes = prediction['boxes'].cpu().numpy()
                 labels = prediction['labels'].cpu().numpy()
                 scores = prediction['scores'].cpu().numpy()
-                
                 # Filter by confidence score
                 keep = scores > config.SCORE_THRESHOLD
                 boxes = boxes[keep]
                 labels = labels[keep]
                 scores = scores[keep]
-                
                 # Plot bounding boxes
                 for box, label, score in zip(boxes, labels, scores):
                     if label == 0:  # Skip background class
                         continue
-                        
                     x1, y1, x2, y2 = box
-                    
                     # Get color for this digit
                     digit = label - 1  # Convert from class ID (starting at 1) to actual digit
                     color = colors[digit]
-                    
                     # Draw the box
                     rect = patches.Rectangle(
                         (x1, y1), x2-x1, y2-y1, 
@@ -266,7 +251,6 @@ def visualize_test_predictions(model, test_loader, device, output_dir, num_sampl
                         facecolor='none'
                     )
                     ax.add_patch(rect)
-                    
                     # Add label and score
                     ax.text(
                         x1, y1-5, 
@@ -275,7 +259,6 @@ def visualize_test_predictions(model, test_loader, device, output_dir, num_sampl
                         fontsize=12, 
                         backgroundcolor=color/255
                     )
-                
                 # Sort predictions by x position to recognize the full number
                 if len(boxes) > 0:
                     sorted_idx = np.argsort([box[0] for box in boxes])
@@ -285,16 +268,12 @@ def visualize_test_predictions(model, test_loader, device, output_dir, num_sampl
                     ax.set_title(f"Image ID: {image_id}, Recognized Number: {recognized_number}")
                 else:
                     ax.set_title(f"Image ID: {image_id}, No digits detected")
-                
                 plt.axis('off')
                 plt.tight_layout()
-                
                 # Save the figure
                 plt.savefig(os.path.join(vis_dir, f'test_prediction_{image_id}.png'), bbox_inches='tight', dpi=300)
                 plt.close(fig)
-                
                 count += 1
-                
                 if count >= num_samples:
                     break
 
@@ -312,73 +291,59 @@ def generate_comparative_visualizations(base_model, improved_model, test_loader,
     # Create directory for visualization
     vis_dir = os.path.join(output_dir, 'model_comparison')
     os.makedirs(vis_dir, exist_ok=True)
-    
     # Set models to evaluation mode
     base_model.eval()
     improved_model.eval()
-    
     # Set up color map for different classes
     colors = cm.get_cmap('hsv')(np.linspace(0, 1, config.NUM_CLASSES - 1))
     colors = (colors[:, :3] * 255).astype(int)
-    
     with torch.no_grad():
         for images, image_ids in tqdm(test_loader, desc="Comparing model predictions"):
             images = [img.to(device) for img in images]
-            
             # Get predictions from both models
             base_predictions = base_model(images)
             improved_predictions = improved_model(images)
-            
-            for i, (image, image_id, base_pred, improved_pred) in enumerate(
-                zip(images, image_ids, base_predictions, improved_predictions)
+            for (image, image_id, base_pred, improved_pred) in zip(
+                images, image_ids, base_predictions, improved_predictions
             ):
                 # Convert image from tensor to numpy for visualization
                 image_np = image.cpu().permute(1, 2, 0).numpy()
-                
                 # Un-normalize the image
                 image_np = image_np * np.array(config.NORMALIZE_STD) + np.array(config.NORMALIZE_MEAN)
                 image_np = np.clip(image_np, 0, 1)
-                
                 # Create figure for side-by-side comparison
                 fig, axes = plt.subplots(1, 2, figsize=(20, 8))
                 axes[0].imshow(image_np)
                 axes[1].imshow(image_np)
-                
                 # Process base model predictions
                 base_boxes = base_pred['boxes'].cpu().numpy()
                 base_labels = base_pred['labels'].cpu().numpy()
                 base_scores = base_pred['scores'].cpu().numpy()
-                
                 # Filter by confidence score
                 base_keep = base_scores > config.SCORE_THRESHOLD
                 base_boxes = base_boxes[base_keep]
                 base_labels = base_labels[base_keep]
                 base_scores = base_scores[base_keep]
-                
                 # Process improved model predictions
                 imp_boxes = improved_pred['boxes'].cpu().numpy()
                 imp_labels = improved_pred['labels'].cpu().numpy()
                 imp_scores = improved_pred['scores'].cpu().numpy()
-                
                 # Filter by confidence score
                 imp_keep = imp_scores > config.SCORE_THRESHOLD
                 imp_boxes = imp_boxes[imp_keep]
                 imp_labels = imp_labels[imp_keep]
                 imp_scores = imp_scores[imp_keep]
-                
                 # Plot base model predictions
                 for box, label, score in zip(base_boxes, base_labels, base_scores):
                     if label == 0:  # Skip background class
                         continue
-                        
                     x1, y1, x2, y2 = box
                     digit = label - 1
                     color = colors[digit]
-                    
                     rect = patches.Rectangle(
                         (x1, y1), x2-x1, y2-y1, 
                         linewidth=2, 
-                        edgecolor=color/255, 
+                        edgecolor=color/255,
                         facecolor='none'
                     )
                     axes[0].add_patch(rect)
@@ -389,20 +354,17 @@ def generate_comparative_visualizations(base_model, improved_model, test_loader,
                         fontsize=12, 
                         backgroundcolor=color/255
                     )
-                
                 # Plot improved model predictions
                 for box, label, score in zip(imp_boxes, imp_labels, imp_scores):
                     if label == 0:  # Skip background class
-                        continue
-                        
+                        continue   
                     x1, y1, x2, y2 = box
                     digit = label - 1
                     color = colors[digit]
-                    
                     rect = patches.Rectangle(
                         (x1, y1), x2-x1, y2-y1, 
                         linewidth=2, 
-                        edgecolor=color/255, 
+                        edgecolor=color/255,
                         facecolor='none'
                     )
                     axes[1].add_patch(rect)
@@ -413,7 +375,6 @@ def generate_comparative_visualizations(base_model, improved_model, test_loader,
                         fontsize=12, 
                         backgroundcolor=color/255
                     )
-                
                 # Sort predictions by x position to recognize the full number
                 if len(base_boxes) > 0:
                     base_sorted_idx = np.argsort([box[0] for box in base_boxes])
@@ -423,7 +384,6 @@ def generate_comparative_visualizations(base_model, improved_model, test_loader,
                     axes[0].set_title(f"Baseline Model: {base_recognized_number}")
                 else:
                     axes[0].set_title("Baseline Model: No digits detected")
-                
                 if len(imp_boxes) > 0:
                     imp_sorted_idx = np.argsort([box[0] for box in imp_boxes])
                     imp_sorted_labels = imp_labels[imp_sorted_idx]
@@ -432,13 +392,10 @@ def generate_comparative_visualizations(base_model, improved_model, test_loader,
                     axes[1].set_title(f"Improved Model: {imp_recognized_number}")
                 else:
                     axes[1].set_title("Improved Model: No digits detected")
-                
                 for ax in axes:
                     ax.axis('off')
-                
                 plt.suptitle(f"Image ID: {image_id}", fontsize=16)
                 plt.tight_layout()
-                
                 # Save the figure
                 plt.savefig(
                     os.path.join(vis_dir, f'model_comparison_{image_id}.png'), 

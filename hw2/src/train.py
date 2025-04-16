@@ -17,9 +17,10 @@ are already defined.
 import os
 import torch
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import config
-from visualizations import plot_training_curves, plot_map_curve, calculate_map, calculate_confusion_matrix, plot_confusion_matrix, plot_precision_recall_curves, visualize_detections
+from visualizations import plot_training_curves, calculate_confusion_matrix
+from visualizations import plot_confusion_matrix, plot_precision_recall_curves
+from visualizations import visualize_detections
 
 def train_one_epoch(model, optimizer, data_loader, device):
     """
@@ -94,15 +95,13 @@ def train_model(
         save_dir = config.CHECKPOINT_DIR
     # Create save directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
-    
     # Create visualization directories
     vis_dir = os.path.join(config.RESULTS_DIR, 'visualizations')
     os.makedirs(vis_dir, exist_ok=True)
-    
     # Set learning rate scheduler
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, 
-        step_size=config.LR_SCHEDULER_STEP_SIZE, 
+        optimizer,
+        step_size=config.LR_SCHEDULER_STEP_SIZE,
         gamma=config.LR_SCHEDULER_GAMMA
     )
     # Early stopping parameters
@@ -112,7 +111,6 @@ def train_model(
     # Record training and validation losses
     train_losses = []
     val_losses = []
-    map_values = []
     best_val_loss = float('inf')
     for epoch in range(num_epochs):
         logger.info("Epoch %d/%d", epoch + 1, num_epochs)
@@ -123,54 +121,37 @@ def train_model(
         # Validation
         val_loss = evaluate(model, val_loader, device, logger)
         val_losses.append(val_loss)
-        
-        # Calculate mAP
-        with torch.no_grad():
-            map_value = calculate_map(model, val_loader, device)
-            map_values.append(map_value)
-            logger.info("mAP@0.5: %.4f", map_value)
-        
         # Update learning rate
         scheduler.step()
         logger.info("Train Loss: %.4f, Val Loss: %.4f", train_loss, val_loss)
         # Save the best model
-        if val_loss < best_val_loss - min_delta:    
+        if val_loss < best_val_loss - min_delta:
             best_val_loss = val_loss
             torch.save(model.state_dict(), os.path.join(save_dir, 'best_model.pth'))
             logger.info("Saved best model!")
             patience_counter = 0
-            
             # Generate visualizations for the best model
             # Confusion matrix
             confusion_mat = calculate_confusion_matrix(model, val_loader, device)
             plot_confusion_matrix(
-                confusion_mat, 
+                confusion_mat,
                 save_path=os.path.join(vis_dir, 'confusion_matrix.png')
             )
-            
             # Precision-recall curves
             plot_precision_recall_curves(
-                model, 
-                val_loader, 
-                device, 
+                model,
+                val_loader,
+                device,
                 save_path=os.path.join(vis_dir, 'precision_recall_curves.png')
             )
-            
             # Detection visualization on validation set
             visualize_detections(
-                model, 
-                val_loader, 
-                device, 
-                num_images=5, 
+                model,
+                val_loader,
+                device,
+                num_images=5,
                 save_dir=os.path.join(vis_dir, 'detections')
             )
-            
-            # Grad-CAM visualization (example images from validation set)
-            # In a real implementation, you would need to specify which layer to use for Grad-CAM
-            # For now, skip this as the actual implementation would be model-specific
-            # Also, the current visualizations.py contains a simplified placeholder for Grad-CAM
-            
-            logger.info("Generated visualizations for the best model")
         else:
             patience_counter += 1
         # Early stopping
@@ -184,26 +165,13 @@ def train_model(
             'optimizer_state_dict': optimizer.state_dict(),
             'scheduler_state_dict': scheduler.state_dict(),
             'train_loss': train_loss,
-            'val_loss': val_loss,
-            'map': map_value,
+            'val_loss': val_loss
         }, os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}.pth'))
-    
     # Plot training and validation loss
     logger.info("Plotting training and validation loss...")
     plot_training_curves(
-        train_losses, 
-        val_losses, 
+        train_losses,
+        val_losses,
         save_path=os.path.join(vis_dir, 'loss_curve.png')
     )
-    
-    # Plot mAP curve
-    plot_map_curve(
-        map_values, 
-        save_path=os.path.join(vis_dir, 'map_curve.png')
-    )
-    
-    # Generate comparison visualizations for different experiments if needed
-    # This would typically be done in a separate script that loads multiple trained models
-    
-    logger.info("Training complete!")
     return model

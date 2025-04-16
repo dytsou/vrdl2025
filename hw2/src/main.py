@@ -19,8 +19,9 @@ from data_preprocessing import get_data_loaders
 from model import get_improved_faster_rcnn_model
 from train import train_model
 from inference import TestDataset
-from inference import inference, recognize_numbers, save_predictions, visualize_test_predictions, generate_comparative_visualizations
-from visualizations import visualize_failure_cases
+from inference import inference, recognize_numbers, save_predictions
+from inference import visualize_test_predictions
+from inference import generate_comparative_visualizations
 
 def set_seed(seed):
     """Set random seed for reproducibility"""
@@ -165,7 +166,6 @@ def main():
             logger.info("Loaded best model for testing from %s", best_model_path)
         else:
             logger.warning("Best model not found at %s, using current model", best_model_path)
-            
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=config.NORMALIZE_MEAN, std=config.NORMALIZE_STD)
@@ -185,41 +185,31 @@ def main():
         # Save predictions
         save_predictions(predictions, number_predictions, args.output_dir)
         logger.info("Predictions saved to %s", args.output_dir)
-        
         # Generate visualizations if requested
         if args.visualize:
             logger.info("Generating test predictions visualizations...")
             visualize_test_predictions(
-                model, 
-                test_loader, 
-                device, 
-                args.output_dir, 
+                model,
+                test_loader,
+                device,
+                args.output_dir,
                 num_samples=args.num_vis_samples
             )
-            
             # Generate failure case analysis on validation set if available
             if args.mode == 'both':
                 logger.info("Generating failure case analysis visualizations...")
                 # Create a separate directory for failure cases
                 failure_dir = os.path.join(args.output_dir, 'failure_cases')
                 os.makedirs(failure_dir, exist_ok=True)
-                
-                visualize_failure_cases(
-                    model,
-                    val_loader,
-                    device,
-                    num_cases=args.num_vis_samples,
-                    save_dir=failure_dir
-                )
-        
         # Compare baseline and improved models if requested
         if args.compare_models and args.baseline_checkpoint:
             logger.info("Comparing baseline and improved models...")
             # Load baseline model
             baseline_model = get_improved_faster_rcnn_model(num_classes=args.num_classes)
             baseline_model.to(device)
-            baseline_model.load_state_dict(torch.load(args.baseline_checkpoint, map_location=device))
-            
+            baseline_model.load_state_dict(torch.load(
+                args.baseline_checkpoint,
+                map_location=device))
             # Generate comparative visualizations
             generate_comparative_visualizations(
                 baseline_model,
@@ -228,8 +218,7 @@ def main():
                 device,
                 args.output_dir
             )
-            
-            logger.info("Model comparison visualizations saved to %s", 
+            logger.info("Model comparison visualizations saved to %s",
                       os.path.join(args.output_dir, 'model_comparison'))
 
 if __name__ == "__main__":
