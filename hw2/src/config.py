@@ -17,13 +17,14 @@ VAL_ANNOTATION = os.path.join(DATA_DIR, 'valid.json')
 OUTPUT_DIR = 'output'
 CHECKPOINT_DIR = 'checkpoints'
 LOG_DIR = 'logs'
+RESULTS_DIR = 'results'
 
 # Model Arguments
 NUM_CLASSES = 11  # 10 classes + 1 for background
 
 # Training Parameters
 BATCH_SIZE = 8
-NUM_EPOCHS = 30
+NUM_EPOCHS = 50
 LEARNING_RATE = 0.005
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0001
@@ -78,8 +79,8 @@ FPN_MAX_LEVEL = 6  # FPN maximum level
 
 # Early Stopping Parameters
 PATIENCE = 5  # Number of epochs to wait before stopping
-MIN_DELTA = 0.001  # Minimum change in validation loss to qualify as an improvement
-
+MIN_DELTA = 0.0005  # Minimum change in validation loss to qualify as an improvement
+EARLY_STOPPING_EPOCH = 10  # Number of epochs to wait before stopping
 # Training settings
 NUM_WORKERS = 8  # Number of data loading workers
 PIN_MEMORY = True  # Use fixed memory (for GPU training)

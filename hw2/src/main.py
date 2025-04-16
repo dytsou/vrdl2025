@@ -19,7 +19,8 @@ from data_preprocessing import get_data_loaders
 from model import get_improved_faster_rcnn_model
 from train import train_model
 from inference import TestDataset
-from inference import inference, recognize_numbers, save_predictions
+from inference import inference, recognize_numbers, save_predictions, visualize_test_predictions, generate_comparative_visualizations
+from visualizations import visualize_failure_cases
 
 def set_seed(seed):
     """Set random seed for reproducibility"""
@@ -75,6 +76,14 @@ def main():
                         help='Random seed')
     parser.add_argument('--num_workers', type=int, default=config.NUM_WORKERS,
                         help='Number of workers for data loading')
+    parser.add_argument('--visualize', action='store_true', default=True,
+                        help='Generate visualizations')
+    parser.add_argument('--num_vis_samples', type=int, default=10,
+                        help='Number of samples to visualize')
+    parser.add_argument('--compare_models', action='store_true', default=True,
+                        help='Compare baseline and improved models')
+    parser.add_argument('--baseline_checkpoint', type=str, default=None,
+                        help='Path to baseline model checkpoint')
     args = parser.parse_args()
     # set standard seed for reproducibility
     set_seed(config.RANDOM_SEED)
@@ -176,6 +185,52 @@ def main():
         # Save predictions
         save_predictions(predictions, number_predictions, args.output_dir)
         logger.info("Predictions saved to %s", args.output_dir)
+        
+        # Generate visualizations if requested
+        if args.visualize:
+            logger.info("Generating test predictions visualizations...")
+            visualize_test_predictions(
+                model, 
+                test_loader, 
+                device, 
+                args.output_dir, 
+                num_samples=args.num_vis_samples
+            )
+            
+            # Generate failure case analysis on validation set if available
+            if args.mode == 'both':
+                logger.info("Generating failure case analysis visualizations...")
+                # Create a separate directory for failure cases
+                failure_dir = os.path.join(args.output_dir, 'failure_cases')
+                os.makedirs(failure_dir, exist_ok=True)
+                
+                visualize_failure_cases(
+                    model,
+                    val_loader,
+                    device,
+                    num_cases=args.num_vis_samples,
+                    save_dir=failure_dir
+                )
+        
+        # Compare baseline and improved models if requested
+        if args.compare_models and args.baseline_checkpoint:
+            logger.info("Comparing baseline and improved models...")
+            # Load baseline model
+            baseline_model = get_improved_faster_rcnn_model(num_classes=args.num_classes)
+            baseline_model.to(device)
+            baseline_model.load_state_dict(torch.load(args.baseline_checkpoint, map_location=device))
+            
+            # Generate comparative visualizations
+            generate_comparative_visualizations(
+                baseline_model,
+                model,
+                test_loader,
+                device,
+                args.output_dir
+            )
+            
+            logger.info("Model comparison visualizations saved to %s", 
+                      os.path.join(args.output_dir, 'model_comparison'))
 
 if __name__ == "__main__":
     main()
