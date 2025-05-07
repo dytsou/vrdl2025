@@ -58,7 +58,7 @@ Memory optimization involved:
 
 The inference pipeline utilized thresholds:
 
-* **Confidence Threshold**: 0.99
+* **Confidence Threshold**: 0.5
 * **Mask Threshold**: 0.6
 
 Results were outputted in a COCO-compatible JSON file with masks encoded using Run-Length Encoding (RLE).

@@ -64,7 +64,7 @@ The trained model will be saved to `/kaggle/working/maskrcnn_model.pth`
 
 The model inference is handled by the `main_test()` function. Key parameters:
 
-- Confidence threshold: 0.9
+- Confidence threshold: 0.5
 - Mask threshold: 0.6
 
 The inference results will be saved to `test-results.json` in COCO format.
