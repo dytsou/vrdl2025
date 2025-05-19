@@ -48,24 +48,6 @@ def load_checkpoint(checkpoint_path, model, optimizer=None):
     return epoch, best_psnr
 
 
-def denormalize(tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
-    """Denormalize tensor to display image"""
-    # Clone the tensor to avoid modifying the original
-    tensor = tensor.clone().detach()
-
-    # Reshape mean and std for broadcasting
-    mean = torch.tensor(mean, device=tensor.device).view(1, 3, 1, 1)
-    std = torch.tensor(std, device=tensor.device).view(1, 3, 1, 1)
-
-    # Denormalize
-    tensor = tensor * std + mean
-
-    # Clamp to ensure values are in [0, 1]
-    tensor = torch.clamp(tensor, 0, 1)
-
-    return tensor
-
-
 def save_predictions_to_npz(model, test_loader, output_path='pred.npz', device='cuda'):
     """Generate and save predictions for test images"""
     model.eval()
@@ -73,26 +55,19 @@ def save_predictions_to_npz(model, test_loader, output_path='pred.npz', device='
 
     with torch.no_grad():
         for batch in test_loader:
-            # Get data
             degraded = batch['degraded'].to(device)
             filenames = batch['filename']
 
-            # Determine degradation type from filename
             degradation_types = ['rain' if 'rain' in filename else 'snow'
                                  for filename in filenames]
 
-            # Process one by one since batch size is 1
             for i, (img, filename, deg_type) in enumerate(zip(degraded, filenames, degradation_types)):
-                # Forward pass
                 output = model(img.unsqueeze(0), deg_type)
 
-                # Denormalize output
-                output = denormalize(output)
+                # Convert to numpy uint8 [0, 255] and transpose to (C, H, W) for npz
+                # Model output is (B, C, H, W), squeeze B
+                output_np = (output.squeeze(0).cpu() * 255.0).byte().numpy()
 
-                # Convert to numpy and transpose to (C, H, W)
-                output_np = output.squeeze(0).cpu().numpy()
-
-                # Store prediction
                 predictions[filename] = output_np
 
     # Save predictions to npz file

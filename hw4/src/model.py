@@ -131,7 +131,8 @@ class Decoder(nn.Module):
             ConvBlock(in_channels, in_channels),
             ResidualBlock(in_channels),
             ConvBlock(in_channels, in_channels),
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.Sigmoid()
         )
 
     def forward(self, x):

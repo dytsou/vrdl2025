@@ -78,10 +78,9 @@ class RestorationDataset(Dataset):
         if self.transform:
             degraded_img = self.transform(degraded_img)
         else:
+            # Default transform to [0, 1] tensor
             transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                                     0.229, 0.224, 0.225])
             ])
             degraded_img = transform(degraded_img)
 
@@ -104,11 +103,9 @@ class RestorationDataset(Dataset):
         if self.transform:
             clean_img = self.transform(clean_img)
         else:
-            # Use the same normalization for clean images
+            # Default transform to [0, 1] tensor
             transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                                     0.229, 0.224, 0.225])
             ])
             clean_img = transform(clean_img)
 
@@ -123,19 +120,23 @@ def get_data_loaders(root_dir, batch_size=16, val_ratio=0.1, num_workers=4):
     """Create data loaders for training, validation and testing"""
 
     # Define transformations
-    transform = transforms.Compose([
+    train_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                             0.229, 0.224, 0.225])
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+    ])
+
+    val_test_transform = transforms.Compose([
+        transforms.ToTensor(),
     ])
 
     # Create datasets
     train_dataset = RestorationDataset(
-        root_dir, split='train', val_ratio=val_ratio, transform=transform)
+        root_dir, split='train', val_ratio=val_ratio, transform=train_transform)
     val_dataset = RestorationDataset(
-        root_dir, split='val', val_ratio=val_ratio, transform=transform)
+        root_dir, split='val', val_ratio=val_ratio, transform=val_test_transform)
     test_dataset = RestorationDataset(
-        root_dir, split='test', transform=transform)
+        root_dir, split='test', transform=val_test_transform)
 
     # Create data loaders
     train_loader = DataLoader(

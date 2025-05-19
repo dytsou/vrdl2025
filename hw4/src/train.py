@@ -49,7 +49,9 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
             # Track metrics
             epoch_loss += loss.item()
             with torch.no_grad():
-                psnr = calculate_psnr(outputs, clean)
+                # Ensure outputs are in [0,1] before PSNR calculation
+                clamped_outputs = torch.clamp(outputs, 0, 1)
+                psnr = calculate_psnr(clamped_outputs, clean)
                 epoch_psnr += psnr
 
             # Update progress bar
@@ -88,7 +90,9 @@ def validate(model, loader, criterion, device):
 
                 # Track metrics
                 val_loss += loss.item()
-                psnr = calculate_psnr(outputs, clean)
+                # Ensure outputs are in [0,1] before PSNR calculation
+                clamped_outputs = torch.clamp(outputs, 0, 1)
+                psnr = calculate_psnr(clamped_outputs, clean)
                 val_psnr += psnr
 
                 # Update progress bar
@@ -123,7 +127,7 @@ def main(args):
     criterion = nn.L1Loss()  # L1 loss is common for image restoration
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=3, verbose=True
+        optimizer, mode='max', factor=0.5, patience=5, verbose=True
     )
 
     # Load checkpoint if resuming
