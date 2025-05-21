@@ -6,13 +6,14 @@ import torch.optim as optim
 from tqdm import tqdm
 import time
 import numpy as np
+from pytorch_msssim import MS_SSIM
 
 from model import PromptIR
 from data import get_data_loaders
 from utils import save_checkpoint, load_checkpoint, calculate_psnr
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device):
+def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, device, args):
     """Train for one epoch"""
     model.train()
     epoch_loss = 0
@@ -40,7 +41,10 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
             outputs = torch.cat(outputs)
 
             # Calculate loss
-            loss = criterion(outputs, clean)
+            l1_loss_val = criterion_l1(outputs, clean)
+            msssim_loss_val = 1 - criterion_msssim(outputs, clean)
+            loss = args.loss_alpha * l1_loss_val + \
+                (1 - args.loss_alpha) * msssim_loss_val
 
             # Backward pass
             loss.backward()
@@ -60,7 +64,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     return epoch_loss / len(loader), epoch_psnr / len(loader)
 
 
-def validate(model, loader, criterion, device):
+def validate(model, loader, criterion_l1, criterion_msssim, device, args):
     """Evaluate model on validation set"""
     model.eval()
     val_loss = 0
@@ -86,7 +90,10 @@ def validate(model, loader, criterion, device):
                 outputs = torch.cat(outputs)
 
                 # Calculate loss
-                loss = criterion(outputs, clean)
+                l1_loss_val = criterion_l1(outputs, clean)
+                msssim_loss_val = 1 - criterion_msssim(outputs, clean)
+                loss = args.loss_alpha * l1_loss_val + \
+                    (1 - args.loss_alpha) * msssim_loss_val
 
                 # Track metrics
                 val_loss += loss.item()
@@ -120,12 +127,15 @@ def main(args):
 
     # Create model
     model = PromptIR(base_channels=args.base_channels,
-                     prompt_dim=args.prompt_dim)
+                     prompt_dim=args.prompt_dim,
+                     num_blocks=args.num_blocks)
     model = model.to(device)
 
     # Define loss and optimizer
-    criterion = nn.L1Loss()  # L1 loss is common for image restoration
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    criterion_l1 = nn.L1Loss().to(device)
+    criterion_msssim = MS_SSIM(
+        data_range=1.0, size_average=True, channel=3).to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='max', factor=0.5, patience=5, verbose=True
     )
@@ -143,12 +153,13 @@ def main(args):
 
         # Train
         train_loss, train_psnr = train_one_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, criterion_l1, criterion_msssim, optimizer, device, args
         )
         print(f"Train Loss: {train_loss:.4f}, Train PSNR: {train_psnr:.2f}")
 
         # Validate
-        val_loss, val_psnr = validate(model, val_loader, criterion, device)
+        val_loss, val_psnr = validate(
+            model, val_loader, criterion_l1, criterion_msssim, device, args)
         print(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr:.2f}")
 
         # Update scheduler
@@ -189,11 +200,15 @@ if __name__ == "__main__":
                         default=64, help='Base number of channels')
     parser.add_argument('--prompt-dim', type=int,
                         default=64, help='Prompt dimension')
+    parser.add_argument('--num-blocks', type=int,
+                        default=9, help='Number of residual blocks in FeatureExtractor')
 
     # Training arguments
     parser.add_argument('--epochs', type=int, default=100,
                         help='Number of epochs')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
+    parser.add_argument('--loss-alpha', type=float, default=0.84,
+                        help='Alpha for L1 loss in combined L1+MS-SSIM loss')
     parser.add_argument('--resume', type=str, default=None,
                         help='Resume from checkpoint')
 

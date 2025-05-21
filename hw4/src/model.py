@@ -142,12 +142,12 @@ class Decoder(nn.Module):
 class PromptIR(nn.Module):
     """PromptIR model for unified rain and snow removal"""
 
-    def __init__(self, base_channels=64, prompt_dim=64):
+    def __init__(self, base_channels=64, prompt_dim=64, num_blocks=9):
         super().__init__()
 
         # Feature extraction
         self.feature_extractor = FeatureExtractor(
-            in_channels=3, base_channels=base_channels)
+            in_channels=3, base_channels=base_channels, num_blocks=num_blocks)
 
         # Prompt encoder
         self.prompt_encoder = PromptEncoder(

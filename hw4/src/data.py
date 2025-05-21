@@ -1,26 +1,30 @@
 import os
+import random
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as TF
 from sklearn.model_selection import train_test_split
 
 
 class RestorationDataset(Dataset):
     """Dataset for image restoration task (rain and snow removal)"""
 
-    def __init__(self, root_dir, split='train', val_ratio=0.1, transform=None):
+    def __init__(self, root_dir, split='train', val_ratio=0.1, transform=None, augment=False):
         """
         Args:
             root_dir: Root directory of the dataset
             split: 'train', 'val', or 'test'
             val_ratio: Ratio of validation set when split is 'train' or 'val'
-            transform: Optional transforms to apply to the images
+            transform: Optional ToTensor and normalization transforms
+            augment: Whether to apply data augmentation (for train split)
         """
         self.root_dir = root_dir
         self.split = split
         self.transform = transform
+        self.augment = augment and self.split == 'train'
 
         if split == 'test':
             self.img_dir = os.path.join(root_dir, 'test', 'degraded')
@@ -62,8 +66,10 @@ class RestorationDataset(Dataset):
             # Select appropriate files for the split
             if split == 'train':
                 self.files = train_files
-            else:  # 'val'
+            elif split == 'val':
                 self.files = val_files
+            else:
+                self.files = degraded_files_all
 
     def __len__(self):
         return len(self.files)
@@ -75,16 +81,16 @@ class RestorationDataset(Dataset):
 
         degraded_img = Image.open(img_path).convert('RGB')
 
-        if self.transform:
-            degraded_img = self.transform(degraded_img)
-        else:
-            # Default transform to [0, 1] tensor
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-            ])
-            degraded_img = transform(degraded_img)
-
         if self.split == 'test':
+            # Apply transforms (ToTensor, Normalization) for test images
+            if self.transform:
+                degraded_img = self.transform(degraded_img)
+            else:
+                # Default transform to [0, 1] tensor if no transform provided
+                to_tensor_transform = transforms.Compose(
+                    [transforms.ToTensor()])
+                degraded_img = to_tensor_transform(degraded_img)
+
             return {
                 'degraded': degraded_img,
                 'filename': img_name
@@ -100,14 +106,38 @@ class RestorationDataset(Dataset):
 
         clean_img = Image.open(clean_img_path).convert('RGB')
 
+        # Apply synchronized augmentations for training set
+        if self.augment:
+            # Random horizontal flip
+            if random.random() > 0.5:
+                degraded_img = TF.hflip(degraded_img)
+                clean_img = TF.hflip(clean_img)
+
+            # Random vertical flip
+            if random.random() > 0.5:
+                degraded_img = TF.vflip(degraded_img)
+                clean_img = TF.vflip(clean_img)
+
+            # Random rotation (e.g., 0, 90, 180, 270 degrees)
+            # angle = random.choice([0, 90, 180, 270])
+            # if angle != 0:
+            #     degraded_img = TF.rotate(degraded_img, angle)
+            #     clean_img = TF.rotate(clean_img, angle)
+            # Or small angle rotations:
+            angle = random.uniform(-10, 10)  # Rotate by a small random angle
+            degraded_img = TF.rotate(degraded_img, angle)
+            clean_img = TF.rotate(clean_img, angle)
+
+        # Apply transforms (ToTensor, Normalization) to both images
         if self.transform:
+            # Apply transform to degraded_img
+            degraded_img = self.transform(degraded_img)
             clean_img = self.transform(clean_img)
         else:
-            # Default transform to [0, 1] tensor
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-            ])
-            clean_img = transform(clean_img)
+            # Default transform to [0, 1] tensor if no transform provided
+            to_tensor_transform = transforms.Compose([transforms.ToTensor()])
+            degraded_img = to_tensor_transform(degraded_img)
+            clean_img = to_tensor_transform(clean_img)
 
         return {
             'degraded': degraded_img,
@@ -120,23 +150,25 @@ def get_data_loaders(root_dir, batch_size=16, val_ratio=0.1, num_workers=4):
     """Create data loaders for training, validation and testing"""
 
     # Define transformations
+    # Geometric augmentations are now handled inside Dataset's __getitem__
+    # So train_transform will only contain ToTensor and potentially normalization
     train_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
+        # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) # Example normalization
     ])
 
     val_test_transform = transforms.Compose([
         transforms.ToTensor(),
+        # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) # Example normalization
     ])
 
     # Create datasets
     train_dataset = RestorationDataset(
-        root_dir, split='train', val_ratio=val_ratio, transform=train_transform)
+        root_dir, split='train', val_ratio=val_ratio, transform=train_transform, augment=True)
     val_dataset = RestorationDataset(
-        root_dir, split='val', val_ratio=val_ratio, transform=val_test_transform)
+        root_dir, split='val', val_ratio=val_ratio, transform=val_test_transform, augment=False)
     test_dataset = RestorationDataset(
-        root_dir, split='test', transform=val_test_transform)
+        root_dir, split='test', transform=val_test_transform, augment=False)
 
     # Create data loaders
     train_loader = DataLoader(

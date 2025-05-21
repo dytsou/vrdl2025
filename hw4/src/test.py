@@ -25,7 +25,8 @@ def main(args):
 
     # Create model
     model = PromptIR(base_channels=args.base_channels,
-                     prompt_dim=args.prompt_dim)
+                     prompt_dim=args.prompt_dim,
+                     num_blocks=args.num_blocks)
     model = model.to(device)
 
     # Load checkpoint
@@ -64,6 +65,8 @@ if __name__ == "__main__":
                         default=64, help='Base number of channels')
     parser.add_argument('--prompt-dim', type=int,
                         default=64, help='Prompt dimension')
+    parser.add_argument('--num-blocks', type=int,
+                        default=9, help='Number of residual blocks in FeatureExtractor')
 
     args = parser.parse_args()
     main(args)
