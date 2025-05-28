@@ -7,6 +7,9 @@ from tqdm import tqdm
 import time
 import numpy as np
 from pytorch_msssim import MS_SSIM
+import csv
+import json
+from pathlib import Path
 
 from model import PromptIR
 from data import get_data_loaders
@@ -114,6 +117,26 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
 
+    # Create output directories
+    os.makedirs(args.output_dir, exist_ok=True)
+    logs_dir = os.path.join(args.output_dir, 'logs')
+    os.makedirs(logs_dir, exist_ok=True)
+
+    # Setup CSV logging
+    log_file = os.path.join(logs_dir, 'training_log.csv')
+    log_exists = os.path.exists(log_file)
+    log_file_handle = open(log_file, 'a' if log_exists else 'w', newline='')
+    log_writer = csv.writer(log_file_handle)
+
+    # Write header if creating a new log file
+    if not log_exists:
+        log_writer.writerow(
+            ['epoch', 'train_loss', 'train_psnr', 'val_loss', 'val_psnr', 'lr'])
+
+    # Save training arguments
+    with open(os.path.join(logs_dir, 'args.json'), 'w') as f:
+        json.dump(vars(args), f, indent=4)
+
     # Create data loaders
     train_loader, val_loader, test_loader = get_data_loaders(
         root_dir=args.data_dir,
@@ -162,6 +185,14 @@ def main(args):
             model, val_loader, criterion_l1, criterion_msssim, device, args)
         print(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr:.2f}")
 
+        # Get current learning rate
+        current_lr = optimizer.param_groups[0]['lr']
+
+        # Log metrics
+        log_writer.writerow(
+            [epoch+1, train_loss, train_psnr, val_loss, val_psnr, current_lr])
+        log_file_handle.flush()
+
         # Update scheduler
         scheduler.step(val_psnr)
 
@@ -177,6 +208,9 @@ def main(args):
             'optimizer': optimizer.state_dict(),
             'best_psnr': best_psnr
         }, is_best, args.output_dir)
+
+    # Close log file
+    log_file_handle.close()
 
 
 if __name__ == "__main__":
