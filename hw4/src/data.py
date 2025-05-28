@@ -7,12 +7,13 @@ from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 from sklearn.model_selection import train_test_split
+from config import DATA_CONFIG, ENV_CONFIG
 
 
 class RestorationDataset(Dataset):
     """Dataset for image restoration task (rain and snow removal)"""
 
-    def __init__(self, root_dir, split='train', val_ratio=0.1, transform=None, augment=False):
+    def __init__(self, root_dir, split='train', val_ratio=DATA_CONFIG['val_ratio'], transform=None, augment=False):
         """
         Args:
             root_dir: Root directory of the dataset
@@ -61,7 +62,7 @@ class RestorationDataset(Dataset):
 
             # Split into train and validation
             train_files, val_files = train_test_split(
-                paired_files, test_size=val_ratio, random_state=42)
+                paired_files, test_size=val_ratio, random_state=ENV_CONFIG['random_seed'])
 
             # Select appropriate files for the split
             if split == 'train':
@@ -146,7 +147,7 @@ class RestorationDataset(Dataset):
         }
 
 
-def get_data_loaders(root_dir, batch_size=16, val_ratio=0.1, num_workers=4):
+def get_data_loaders(root_dir, batch_size=DATA_CONFIG['batch_size'], val_ratio=DATA_CONFIG['val_ratio'], num_workers=DATA_CONFIG['num_workers']):
     """Create data loaders for training, validation and testing"""
 
     # Define transformations

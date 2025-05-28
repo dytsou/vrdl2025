@@ -15,6 +15,9 @@ from einops import rearrange
 from einops.layers.torch import Rearrange
 import time
 
+# Import configuration
+from config import MODEL_CONFIG, PROMPT_CONFIG, HOG_CONFIG
+
 # from skimage.feature import hog # Removed unused import
 
 
@@ -149,8 +152,8 @@ class FastHOGAwareAttention(nn.Module):
                  dim,
                  num_heads,
                  bias,
-                 orientations: int = 9,
-                 eps: float = 1e-6):
+                 orientations: int = HOG_CONFIG['orientations'],
+                 eps: float = HOG_CONFIG['eps']):
         """
         dim          : number of channels in QKV
         num_heads    : number of attention heads
@@ -320,7 +323,7 @@ class OverlapPatchEmbed(nn.Module):
 ##########################################################################
 # ---------- Prompt Gen Module -----------------------
 class PromptGenBlock(nn.Module):
-    def __init__(self, prompt_dim=128, prompt_len=5, prompt_size=96, lin_dim=192):
+    def __init__(self, prompt_dim=128, prompt_len=PROMPT_CONFIG['prompt_len'], prompt_size=96, lin_dim=192):
         super(PromptGenBlock, self).__init__()
         self.prompt_param = nn.Parameter(torch.rand(
             1, prompt_len, prompt_dim, prompt_size, prompt_size))
@@ -346,55 +349,80 @@ class PromptGenBlock(nn.Module):
 
 class PromptIR(nn.Module):
     def __init__(self,
-                 inp_channels=3,
-                 out_channels=3,
-                 dim=48,
-                 num_blocks=[4, 6, 6, 8],
-                 num_refinement_blocks=4,
-                 heads=[1, 2, 4, 8],
-                 ffn_expansion_factor=2.66,
-                 bias=False,
-                 LayerNorm_type='WithBias',  # Other option 'BiasFree'
-                 decoder=False,
+                 inp_channels=MODEL_CONFIG['inp_channels'],
+                 out_channels=MODEL_CONFIG['out_channels'],
+                 dim=MODEL_CONFIG['base_channels'],
+                 num_blocks=MODEL_CONFIG['num_blocks'],
+                 num_refinement_blocks=MODEL_CONFIG['num_refinement_blocks'],
+                 heads=MODEL_CONFIG['heads'],
+                 ffn_expansion_factor=MODEL_CONFIG['ffn_expansion_factor'],
+                 bias=MODEL_CONFIG['bias'],
+                 LayerNorm_type=MODEL_CONFIG['LayerNorm_type'],
+                 decoder=MODEL_CONFIG['decoder'],
+                 base_channels=None,  # Added parameter for compatibility
+                 prompt_dim=MODEL_CONFIG['prompt_dim'],
                  ):
 
         super(PromptIR, self).__init__()
 
+        # Handle compatibility with training/visualization scripts
+        if base_channels is not None:
+            dim = base_channels
+
+        # Convert num_blocks from int to list if it's an integer
+        if isinstance(num_blocks, int):
+            n = num_blocks
+            # Distribute blocks across 4 levels: [n//4, n//4, n//4, n-3*(n//4)]
+            num_blocks = [n//4, n//4, n//4, n-3*(n//4)]
+
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
         self.decoder = decoder
 
-        prompt1_ch = 64
-        prompt2_ch = 128
-        prompt3_ch = 320
+        # Set prompt channel dimensions, use prompt_dim if provided
+        if prompt_dim is not None:
+            # Scale prompt dimensions proportionally
+            prompt1_ch = max(1, prompt_dim)  # Level 1 prompt dimension
+            prompt2_ch = max(1, prompt_dim * 2)  # Level 2 prompt dimension
+            prompt3_ch = max(1, prompt_dim * 4)  # Level 3 prompt dimension
+        else:
+            prompt1_ch = 64
+            prompt2_ch = 128
+            prompt3_ch = 256  # Reduced from 320 to avoid dimension mismatch
 
         if self.decoder:
             self.prompt1 = PromptGenBlock(
-                prompt_dim=prompt1_ch, prompt_len=5, prompt_size=64, lin_dim=int(dim*2**1))
+                prompt_dim=prompt1_ch, prompt_len=PROMPT_CONFIG['prompt_len'],
+                prompt_size=PROMPT_CONFIG['prompt_sizes'][0], lin_dim=int(dim*2**1))
             self.prompt2 = PromptGenBlock(
-                prompt_dim=prompt2_ch, prompt_len=5, prompt_size=32, lin_dim=int(dim*2**2))
+                prompt_dim=prompt2_ch, prompt_len=PROMPT_CONFIG['prompt_len'],
+                prompt_size=PROMPT_CONFIG['prompt_sizes'][1], lin_dim=int(dim*2**2))
             self.prompt3 = PromptGenBlock(
-                prompt_dim=prompt3_ch, prompt_len=5, prompt_size=16, lin_dim=int(dim*2**3))
+                prompt_dim=prompt3_ch, prompt_len=PROMPT_CONFIG['prompt_len'],
+                prompt_size=PROMPT_CONFIG['prompt_sizes'][2], lin_dim=int(dim*2**3))
 
-        self.chnl_reduce1 = nn.Conv2d(64, 64, kernel_size=1, bias=bias)
-        self.chnl_reduce2 = nn.Conv2d(128, 128, kernel_size=1, bias=bias)
-        self.chnl_reduce3 = nn.Conv2d(320, 256, kernel_size=1, bias=bias)
+        self.chnl_reduce1 = nn.Conv2d(
+            prompt1_ch, prompt1_ch, kernel_size=1, bias=bias)
+        self.chnl_reduce2 = nn.Conv2d(
+            prompt2_ch, prompt2_ch, kernel_size=1, bias=bias)
+        self.chnl_reduce3 = nn.Conv2d(
+            prompt3_ch, prompt3_ch, kernel_size=1, bias=bias)
 
         self.reduce_noise_channel_1 = nn.Conv2d(
-            dim + 64, dim, kernel_size=1, bias=bias)
+            dim + prompt1_ch, dim, kernel_size=1, bias=bias)
         self.encoder_level1 = nn.Sequential(*[TransformerBlock(dim=dim, num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor,
                                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[0])])
 
         self.down1_2 = Downsample(dim)  # From Level 1 to Level 2
 
         self.reduce_noise_channel_2 = nn.Conv2d(
-            int(dim*2**1) + 128, int(dim*2**1), kernel_size=1, bias=bias)
+            int(dim*2**1) + prompt2_ch, int(dim*2**1), kernel_size=1, bias=bias)
         self.encoder_level2 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**1), num_heads=heads[1],
                                             ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
 
         self.down2_3 = Downsample(int(dim*2**1))  # From Level 2 to Level 3
 
         self.reduce_noise_channel_3 = nn.Conv2d(
-            int(dim*2**2) + 256, int(dim*2**2), kernel_size=1, bias=bias)
+            int(dim*2**2) + prompt3_ch, int(dim*2**2), kernel_size=1, bias=bias)
         self.encoder_level3 = nn.Sequential(*[TransformerBlock(dim=int(dim*2**2), num_heads=heads[2],
                                             ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[2])])
 
@@ -452,7 +480,18 @@ class PromptIR(nn.Module):
         self.output = nn.Conv2d(
             int(dim*2**1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
 
-    def forward(self, inp_img, noise_emb=None):
+    def forward(self, inp_img, degradation_type=None):
+        """
+        Forward pass for PromptIR
+
+        Args:
+            inp_img: Input degraded image
+            degradation_type: String indicating degradation type ('rain' or 'snow')
+                              Used instead of noise_emb for API compatibility
+        """
+        # For backwards compatibility, allow both noise_emb and degradation_type
+        # degradation_type is ignored in this implementation since the model
+        # doesn't need it explicitly - the prompt generator blocks handle the features
 
         inp_enc_level1 = self.patch_embed(inp_img)
 

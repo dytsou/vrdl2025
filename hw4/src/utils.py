@@ -2,6 +2,7 @@ import os
 import torch
 import numpy as np
 import math
+from config import DATA_CONFIG
 
 
 def calculate_psnr(img1, img2):
@@ -13,7 +14,7 @@ def calculate_psnr(img1, img2):
     return 20 * torch.log10(1.0 / torch.sqrt(mse))
 
 
-def save_checkpoint(state, is_best, output_dir='output'):
+def save_checkpoint(state, is_best, output_dir=DATA_CONFIG['output_dir']):
     """Save model checkpoint"""
     os.makedirs(output_dir, exist_ok=True)
 

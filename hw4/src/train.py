@@ -13,8 +13,12 @@ import torch.nn as nn
 import torch
 import argparse
 import os
+
+# Import configuration
+from config import DATA_CONFIG, MODEL_CONFIG, TRAIN_CONFIG, ENV_CONFIG
+
 # Set PyTorch CUDA allocation configuration
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:128'
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = ENV_CONFIG['cuda_alloc_conf']
 torch.cuda.empty_cache()
 torch.cuda.ipc_collect()
 
@@ -196,7 +200,8 @@ def main(args):
         data_range=1.0, size_average=True, channel=3).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=5
+        optimizer, mode='max', factor=TRAIN_CONFIG['scheduler_factor'],
+        patience=TRAIN_CONFIG['scheduler_patience']
     )
 
     # Load checkpoint if resuming
@@ -255,27 +260,28 @@ if __name__ == "__main__":
 
     # Data arguments
     parser.add_argument('--data-dir', type=str,
-                        default='data', help='Path to data directory containing rain and snow images')
+                        default=DATA_CONFIG['data_dir'], help='Path to data directory containing rain and snow images')
     parser.add_argument('--output-dir', type=str,
-                        default='output', help='Output directory for checkpoints and logs')
+                        default=DATA_CONFIG['output_dir'], help='Output directory for checkpoints and logs')
     parser.add_argument('--batch-size', type=int,
-                        default=8, help='Batch size for training')
+                        default=DATA_CONFIG['batch_size'], help='Batch size for training')
     parser.add_argument('--val-ratio', type=float,
-                        default=0.1, help='Validation set ratio')
-    parser.add_argument('--num-workers', type=int, default=4,
+                        default=DATA_CONFIG['val_ratio'], help='Validation set ratio')
+    parser.add_argument('--num-workers', type=int, default=DATA_CONFIG['num_workers'],
                         help='Number of workers for data loading')
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=64, help='Base number of channels (dim) in the model')
+                        default=MODEL_CONFIG['base_channels'], help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=9, help='Number of transformer blocks (will be distributed across 4 levels)')
+                        default=MODEL_CONFIG['num_blocks'], help='Number of transformer blocks (will be distributed across 4 levels)')
 
     # Training arguments
-    parser.add_argument('--epochs', type=int, default=100,
+    parser.add_argument('--epochs', type=int, default=TRAIN_CONFIG['epochs'],
                         help='Number of training epochs')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--loss-alpha', type=float, default=0.84,
+    parser.add_argument('--lr', type=float,
+                        default=TRAIN_CONFIG['lr'], help='Learning rate')
+    parser.add_argument('--loss-alpha', type=float, default=TRAIN_CONFIG['loss_alpha'],
                         help='Weight for L1 loss in combined L1+MS-SSIM loss (1-alpha for MS-SSIM)')
     parser.add_argument('--resume', type=str, default=None,
                         help='Path to checkpoint to resume training from')

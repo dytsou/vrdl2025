@@ -6,6 +6,7 @@ import numpy as np
 from model import PromptIR
 from data import get_data_loaders
 from utils import load_checkpoint, save_predictions_to_npz
+from config import DATA_CONFIG, MODEL_CONFIG
 
 
 def main(args):
@@ -18,7 +19,7 @@ def main(args):
     _, _, test_loader = get_data_loaders(
         root_dir=args.data_dir,
         batch_size=1,  # Process one image at a time for test
-        val_ratio=0.1,
+        val_ratio=DATA_CONFIG['val_ratio'],
         num_workers=1
     )
     print(f"Test: {len(test_loader.dataset)} images")
@@ -33,16 +34,16 @@ def main(args):
         blocks = args.num_blocks
 
     model = PromptIR(
-        inp_channels=3,
-        out_channels=3,
+        inp_channels=MODEL_CONFIG['inp_channels'],
+        out_channels=MODEL_CONFIG['out_channels'],
         dim=args.base_channels,
         num_blocks=blocks,
-        num_refinement_blocks=4,
-        heads=[1, 2, 4, 8],
-        ffn_expansion_factor=2.66,
-        bias=False,
-        LayerNorm_type='WithBias',
-        decoder=True  # Enable prompt functionality
+        num_refinement_blocks=MODEL_CONFIG['num_refinement_blocks'],
+        heads=MODEL_CONFIG['heads'],
+        ffn_expansion_factor=MODEL_CONFIG['ffn_expansion_factor'],
+        bias=MODEL_CONFIG['bias'],
+        LayerNorm_type=MODEL_CONFIG['LayerNorm_type'],
+        decoder=MODEL_CONFIG['decoder']  # Enable prompt functionality
     )
     model = model.to(device)
 
@@ -87,7 +88,7 @@ if __name__ == "__main__":
 
     # Data arguments
     parser.add_argument('--data-dir', type=str,
-                        default='data', help='Path to data directory')
+                        default=DATA_CONFIG['data_dir'], help='Path to data directory')
     parser.add_argument('--checkpoint', type=str,
                         required=True, help='Path to model checkpoint')
     parser.add_argument('--output', type=str,
@@ -95,9 +96,9 @@ if __name__ == "__main__":
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=64, help='Base number of channels (dim) in the model')
+                        default=MODEL_CONFIG['base_channels'], help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=9, help='Number of transformer blocks (will be distributed across 4 levels)')
+                        default=MODEL_CONFIG['num_blocks'], help='Number of transformer blocks (will be distributed across 4 levels)')
 
     args = parser.parse_args()
     main(args)
