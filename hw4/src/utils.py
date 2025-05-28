@@ -11,7 +11,7 @@ def calculate_psnr(img1, img2):
     """Calculate PSNR (Peak Signal-to-Noise Ratio) between two images"""
     # img1 and img2 have range [0, 1]
     mse = torch.mean((img1 - img2) ** 2)
-    if mse == 0:
+    if mse.item() == 0:
         return float('inf')
     return 20 * torch.log10(1.0 / torch.sqrt(mse))
 
