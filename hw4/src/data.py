@@ -118,15 +118,15 @@ class RestorationDataset(Dataset):
                 degraded_img = TF.vflip(degraded_img)
                 clean_img = TF.vflip(clean_img)
 
-            # Random rotation (e.g., 0, 90, 180, 270 degrees)
-            # angle = random.choice([0, 90, 180, 270])
-            # if angle != 0:
-            #     degraded_img = TF.rotate(degraded_img, angle)
-            #     clean_img = TF.rotate(clean_img, angle)
+            # Random rotation
+            angle = random.choice([0, 90, 180, 270])
+            if angle != 0:
+                degraded_img = TF.rotate(degraded_img, angle)
+                clean_img = TF.rotate(clean_img, angle)
             # Or small angle rotations:
-            angle = random.uniform(-10, 10)  # Rotate by a small random angle
-            degraded_img = TF.rotate(degraded_img, angle)
-            clean_img = TF.rotate(clean_img, angle)
+            # angle = random.uniform(-10, 10)
+            # degraded_img = TF.rotate(degraded_img, angle)
+            # clean_img = TF.rotate(clean_img, angle)
 
         # Apply transforms (ToTensor, Normalization) to both images
         if self.transform:
@@ -154,12 +154,10 @@ def get_data_loaders(root_dir, batch_size=16, val_ratio=0.1, num_workers=4):
     # So train_transform will only contain ToTensor and potentially normalization
     train_transform = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) # Example normalization
     ])
 
     val_test_transform = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) # Example normalization
     ])
 
     # Create datasets
@@ -189,7 +187,7 @@ def get_data_loaders(root_dir, batch_size=16, val_ratio=0.1, num_workers=4):
 
     test_loader = DataLoader(
         test_dataset,
-        batch_size=1,  # Process one test image at a time
+        batch_size=1,
         shuffle=False,
         num_workers=1,
         pin_memory=True
