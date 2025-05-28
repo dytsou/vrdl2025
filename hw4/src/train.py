@@ -1,18 +1,18 @@
-from utils import save_checkpoint, load_checkpoint, calculate_psnr
-from data import get_data_loaders
-from model import PromptIR
-from pathlib import Path
+"""
+Train the PromptIR model.
+"""
+import os
 import json
 import csv
-from pytorch_msssim import MS_SSIM
-import numpy as np
-import time
-from tqdm import tqdm
+import argparse
 import torch.optim as optim
 import torch.nn as nn
 import torch
-import argparse
-import os
+from pytorch_msssim import MS_SSIM
+from tqdm import tqdm
+from utils import save_checkpoint, load_checkpoint, calculate_psnr
+from data import get_data_loaders
+from model import PromptIR
 
 # Import configuration
 from config import DATA_CONFIG, MODEL_CONFIG, TRAIN_CONFIG, ENV_CONFIG
@@ -148,7 +148,8 @@ def main(args):
     # Setup CSV logging
     log_file = os.path.join(logs_dir, 'training_log.csv')
     log_exists = os.path.exists(log_file)
-    log_file_handle = open(log_file, 'a' if log_exists else 'w', newline='')
+    log_file_handle = open(
+        log_file, 'a' if log_exists else 'w', newline='', encoding='utf-8')
     log_writer = csv.writer(log_file_handle)
 
     # Write header if creating a new log file
@@ -157,7 +158,7 @@ def main(args):
             ['epoch', 'train_loss', 'train_psnr', 'val_loss', 'val_psnr', 'lr'])
 
     # Save training arguments
-    with open(os.path.join(logs_dir, 'args.json'), 'w') as f:
+    with open(os.path.join(logs_dir, 'args.json'), 'w', encoding='utf-8') as f:
         json.dump(vars(args), f, indent=4)
 
     # Create data loaders
@@ -260,21 +261,28 @@ if __name__ == "__main__":
 
     # Data arguments
     parser.add_argument('--data-dir', type=str,
-                        default=DATA_CONFIG['data_dir'], help='Path to data directory containing rain and snow images')
+                        default=DATA_CONFIG['data_dir'],
+                        help='Path to data directory containing rain and snow images')
     parser.add_argument('--output-dir', type=str,
-                        default=DATA_CONFIG['output_dir'], help='Output directory for checkpoints and logs')
+                        default=DATA_CONFIG['output_dir'],
+                        help='Output directory for checkpoints and logs')
     parser.add_argument('--batch-size', type=int,
-                        default=DATA_CONFIG['batch_size'], help='Batch size for training')
+                        default=DATA_CONFIG['batch_size'],
+                        help='Batch size for training')
     parser.add_argument('--val-ratio', type=float,
-                        default=DATA_CONFIG['val_ratio'], help='Validation set ratio')
-    parser.add_argument('--num-workers', type=int, default=DATA_CONFIG['num_workers'],
+                        default=DATA_CONFIG['val_ratio'],
+                        help='Validation set ratio')
+    parser.add_argument('--num-workers', type=int,
+                        default=DATA_CONFIG['num_workers'],
                         help='Number of workers for data loading')
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=MODEL_CONFIG['base_channels'], help='Base number of channels (dim) in the model')
+                        default=MODEL_CONFIG['base_channels'],
+                        help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=MODEL_CONFIG['num_blocks'], help='Number of transformer blocks (will be distributed across 4 levels)')
+                        default=MODEL_CONFIG['num_blocks'],
+                        help='Number of transformer blocks (will be distributed across 4 levels)')
 
     # Training arguments
     parser.add_argument('--epochs', type=int, default=TRAIN_CONFIG['epochs'],
@@ -286,9 +294,9 @@ if __name__ == "__main__":
     parser.add_argument('--resume', type=str, default=None,
                         help='Path to checkpoint to resume training from')
 
-    args = parser.parse_args()
+    parser_args = parser.parse_args()
 
     # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(parser_args.output_dir, exist_ok=True)
 
-    main(args)
+    main(parser_args)

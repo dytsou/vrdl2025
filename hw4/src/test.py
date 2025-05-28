@@ -1,11 +1,13 @@
-import os
+"""
+Test the PromptIR model on the test set.
+"""
 import argparse
 import torch
 import numpy as np
 
 from model import PromptIR
 from data import get_data_loaders
-from utils import load_checkpoint, save_predictions_to_npz
+from utils import load_checkpoint
 from config import DATA_CONFIG, MODEL_CONFIG
 
 
@@ -96,9 +98,11 @@ if __name__ == "__main__":
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=MODEL_CONFIG['base_channels'], help='Base number of channels (dim) in the model')
+                        default=MODEL_CONFIG['base_channels'],
+                        help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=MODEL_CONFIG['num_blocks'], help='Number of transformer blocks (will be distributed across 4 levels)')
+                        default=MODEL_CONFIG['num_blocks'],
+                        help='Number of transformer blocks (will be distributed across 4 levels)')
 
-    args = parser.parse_args()
-    main(args)
+    parser_args = parser.parse_args()
+    main(parser_args)

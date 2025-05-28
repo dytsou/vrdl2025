@@ -1,7 +1,9 @@
+"""
+Utils for the project.
+"""
 import os
 import torch
 import numpy as np
-import math
 from config import DATA_CONFIG
 
 
@@ -62,7 +64,8 @@ def save_predictions_to_npz(model, test_loader, output_path='pred.npz', device='
             degradation_types = ['rain' if 'rain' in filename else 'snow'
                                  for filename in filenames]
 
-            for i, (img, filename, deg_type) in enumerate(zip(degraded, filenames, degradation_types)):
+            for _, (img, filename, deg_type) in enumerate(
+                    zip(degraded, filenames, degradation_types)):
                 output = model(img.unsqueeze(0), deg_type)
 
                 # Convert to numpy uint8 [0, 255] and transpose to (C, H, W) for npz

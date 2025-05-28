@@ -1,7 +1,9 @@
+"""
+Data loading and processing for the image restoration task.
+"""
+
 import os
 import random
-import numpy as np
-import torch
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import torchvision.transforms as transforms
@@ -13,7 +15,12 @@ from config import DATA_CONFIG, ENV_CONFIG
 class RestorationDataset(Dataset):
     """Dataset for image restoration task (rain and snow removal)"""
 
-    def __init__(self, root_dir, split='train', val_ratio=DATA_CONFIG['val_ratio'], transform=None, augment=False):
+    def __init__(self,
+                 root_dir,
+                 split='train',
+                 val_ratio=DATA_CONFIG['val_ratio'],
+                 transform=None,
+                 augment=False):
         """
         Args:
             root_dir: Root directory of the dataset
@@ -147,7 +154,10 @@ class RestorationDataset(Dataset):
         }
 
 
-def get_data_loaders(root_dir, batch_size=DATA_CONFIG['batch_size'], val_ratio=DATA_CONFIG['val_ratio'], num_workers=DATA_CONFIG['num_workers']):
+def get_data_loaders(root_dir,
+                     batch_size=DATA_CONFIG['batch_size'],
+                     val_ratio=DATA_CONFIG['val_ratio'],
+                     num_workers=DATA_CONFIG['num_workers']):
     """Create data loaders for training, validation and testing"""
 
     # Define transformations
