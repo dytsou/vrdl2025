@@ -102,7 +102,11 @@ The figure above shows sample restored images from the test set. The left column
 ## 6. References
 
 \[1\] Y. Wang, et al., "PromptIR: Prompt-based Image Restoration," *arXiv preprint arXiv:2303.07335*, 2023.  
-\[2\] PyTorch Documentation, "Automatic Mixed Precision (AMP)." \[Online\]. Available: https://pytorch.org/docs/stable/amp.html  
-\[3\] Albumentations: Fast and Flexible Image Augmentations, \[Online\]. Available: https://github.com/albumentations-team/albumentations  
-\[4\] COCO Consortium, "COCO: Common Objects in Context," \[Online\]. Available: https://cocodataset.org  
-\[5\] Official PromptIR GitHub Repository, \[Online\]. Available: https://github.com/lyh-18/PromptIR
+
+\[2\] PyTorch Documentation, "Automatic Mixed Precision (AMP)." \[Online\]. Available: [https://pytorch.org/docs/stable/amp.html](https://pytorch.org/docs/stable/amp.html)
+
+\[3\] A. Buslaev, et al., "Albumentations: Fast and Flexible Image Augmentations," *Information*, vol. 11, no. 2, p. 125, 2020.
+
+\[4\] COCO Consortium, "COCO: Common Objects in Context," \[Online\]. Available: [https://cocodataset.org](https://cocodataset.org)
+
+\[5\] Official PromptIR GitHub Repository, \[Online\]. Available: [https://github.com/lyh-18/PromptIR](https://github.com/lyh-18/PromptIR)
