@@ -77,7 +77,7 @@ def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, de
                 epoch_psnr += psnr
 
             # Update progress bar
-            pbar.set_postfix(loss=loss.item(), psnr=psnr)
+            pbar.set_postfix(loss=loss.item(), psnr=psnr.item())
 
     return epoch_loss / len(loader), epoch_psnr / len(loader)
 
@@ -220,28 +220,29 @@ def main(args):
         train_loss, train_psnr = train_one_epoch(
             model, train_loader, criterion_l1, criterion_msssim, optimizer, device, args
         )
-        print(f"Train Loss: {train_loss:.4f}, Train PSNR: {train_psnr:.2f}")
+        print(
+            f"Train Loss: {train_loss:.4f}, Train PSNR: {train_psnr.item():.2f}")
 
         # Validate
         val_loss, val_psnr = validate(
             model, val_loader, criterion_l1, criterion_msssim, device, args)
-        print(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr:.2f}")
+        print(f"Val Loss: {val_loss:.4f}, Val PSNR: {val_psnr.item():.2f}")
 
         # Get current learning rate
         current_lr = optimizer.param_groups[0]['lr']
 
         # Log metrics
         log_writer.writerow(
-            [epoch+1, train_loss, train_psnr, val_loss, val_psnr, current_lr])
+            [epoch+1, train_loss, train_psnr.item(), val_loss, val_psnr.item(), current_lr])
         log_file_handle.flush()
 
         # Update scheduler
-        scheduler.step(val_psnr)
+        scheduler.step(val_psnr.item())
 
         # Save checkpoint
-        is_best = val_psnr > best_psnr
+        is_best = val_psnr.item() > best_psnr
         if is_best:
-            best_psnr = val_psnr
+            best_psnr = val_psnr.item()
             print(f"New best PSNR: {best_psnr:.2f}")
 
         save_checkpoint({
