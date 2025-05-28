@@ -23,6 +23,20 @@ torch.cuda.empty_cache()
 torch.cuda.ipc_collect()
 
 
+def extract_degradation_types(filenames):
+    """Extract degradation types from filenames"""
+    degradation_types = []
+    for filename in filenames:
+        if 'rain' in filename:
+            degradation_types.append('rain')
+        elif 'snow' in filename:
+            degradation_types.append('snow')
+        else:
+            raise ValueError(
+                f"Invalid filename {filename}: must contain 'rain' or 'snow'")
+    return degradation_types
+
+
 def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, device, args):
     """Train for one epoch"""
     model.train()
@@ -38,15 +52,7 @@ def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, de
 
             # Determine degradation type from filename
             # Assuming filenames contain 'rain' or 'snow'
-            degradation_types = []
-            for filename in filenames:
-                if 'rain' in filename:
-                    degradation_types.append('rain')
-                elif 'snow' in filename:
-                    degradation_types.append('snow')
-                else:
-                    raise ValueError(
-                        f"Invalid filename {filename}: must contain 'rain' or 'snow'")
+            degradation_types = extract_degradation_types(filenames)
 
             # Forward pass
             optimizer.zero_grad()
@@ -97,15 +103,7 @@ def validate(model, loader, criterion_l1, criterion_msssim, device, args):
                 filenames = batch['filename']
 
                 # Determine degradation type from filename
-                degradation_types = []
-                for filename in filenames:
-                    if 'rain' in filename:
-                        degradation_types.append('rain')
-                    elif 'snow' in filename:
-                        degradation_types.append('snow')
-                    else:
-                        raise ValueError(
-                            f"Invalid filename {filename}: must contain 'rain' or 'snow'")
+                degradation_types = extract_degradation_types(filenames)
 
                 # Forward pass
                 outputs = []
