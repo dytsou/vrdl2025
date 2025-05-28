@@ -13,6 +13,7 @@ This project implements a unified deep learning model (PromptIR) for restoring i
 │   └── test/
 │       └── degraded/    # Test set degraded images
 ├── src/
+│   ├── config.py        # Centralized configuration parameters
 │   ├── data.py          # Data loading and preprocessing
 │   ├── model.py         # PromptIR implementation
 │   ├── train.py         # Training script
@@ -43,6 +44,16 @@ The dataset should be organized as follows:
 
 Degraded images should have filenames that indicate their degradation type (containing "rain" or "snow").
 
+## Configuration
+
+All hyperparameters are centralized in `src/config.py` and organized into logical groups:
+- `DATA_CONFIG`: Data loading parameters (paths, batch sizes, etc.)
+- `MODEL_CONFIG`: Model architecture parameters (channels, blocks, etc.)
+- `PROMPT_CONFIG`: Prompt-specific parameters
+- `TRAIN_CONFIG`: Training hyperparameters (learning rate, epochs, etc.)
+- `HOG_CONFIG`: HOG attention parameters
+- `ENV_CONFIG`: Environment settings
+
 ## Training
 
 To train the model:
@@ -56,7 +67,7 @@ If you encounter CUDA Out Of Memory errors, try reducing the `--batch-size` (e.g
 Additional arguments:
 - `--val-ratio`: Ratio of validation set (default: 0.1)
 - `--base-channels`: Base number of channels in model (default: 64)
-- `--prompt-dim`: Prompt dimension (default: 64)
+- `--num-blocks`: Number of transformer blocks (default: 9)
 - `--resume`: Path to checkpoint to resume training
 
 ## Testing
