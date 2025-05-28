@@ -24,9 +24,26 @@ def main(args):
     print(f"Test: {len(test_loader.dataset)} images")
 
     # Create model
-    model = PromptIR(base_channels=args.base_channels,
-                     prompt_dim=args.prompt_dim,
-                     num_blocks=args.num_blocks)
+    # Convert num_blocks from int to list if it's an integer
+    if isinstance(args.num_blocks, int):
+        n = args.num_blocks
+        # Distribute blocks across 4 levels: [n//4, n//4, n//4, n-3*(n//4)]
+        blocks = [n//4, n//4, n//4, n-3*(n//4)]
+    else:
+        blocks = args.num_blocks
+
+    model = PromptIR(
+        inp_channels=3,
+        out_channels=3,
+        dim=args.base_channels,
+        num_blocks=blocks,
+        num_refinement_blocks=4,
+        heads=[1, 2, 4, 8],
+        ffn_expansion_factor=2.66,
+        bias=False,
+        LayerNorm_type='WithBias',
+        decoder=True  # Enable prompt functionality
+    )
     model = model.to(device)
 
     # Load checkpoint
@@ -40,12 +57,28 @@ def main(args):
     model.eval()
 
     # Generate and save predictions
-    save_predictions_to_npz(
-        model=model,
-        test_loader=test_loader,
-        output_path=args.output,
-        device=device
-    )
+    with torch.no_grad():
+        predictions = []
+        filenames = []
+        for batch in test_loader:
+            degraded = batch['degraded'].to(device)
+            filename = batch['filename'][0]  # Get filename for this image
+
+            # Determine degradation type from filename
+            degradation_type = 'rain' if 'rain' in filename else 'snow'
+
+            # Forward pass with degradation type as positional argument
+            # Model expects (inp_img, noise_emb=None)
+            output = model(degraded, degradation_type)
+
+            # Store prediction and filename
+            predictions.append(output.cpu().numpy())
+            filenames.append(filename)
+
+        # Save predictions
+        np.savez(args.output,
+                 predictions=np.array(predictions),
+                 filenames=np.array(filenames))
 
 
 if __name__ == "__main__":
@@ -62,11 +95,9 @@ if __name__ == "__main__":
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=64, help='Base number of channels')
-    parser.add_argument('--prompt-dim', type=int,
-                        default=64, help='Prompt dimension')
+                        default=64, help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=9, help='Number of residual blocks in FeatureExtractor')
+                        default=9, help='Number of transformer blocks (will be distributed across 4 levels)')
 
     args = parser.parse_args()
     main(args)

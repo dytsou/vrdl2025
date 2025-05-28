@@ -1,19 +1,22 @@
-import os
-import argparse
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from tqdm import tqdm
-import time
-import numpy as np
-from pytorch_msssim import MS_SSIM
-import csv
-import json
-from pathlib import Path
-
-from model import PromptIR
-from data import get_data_loaders
 from utils import save_checkpoint, load_checkpoint, calculate_psnr
+from data import get_data_loaders
+from model import PromptIR
+from pathlib import Path
+import json
+import csv
+from pytorch_msssim import MS_SSIM
+import numpy as np
+import time
+from tqdm import tqdm
+import torch.optim as optim
+import torch.nn as nn
+import torch
+import argparse
+import os
+# Set PyTorch CUDA allocation configuration
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True,max_split_size_mb:128'
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
 
 
 def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, device, args):
@@ -31,14 +34,22 @@ def train_one_epoch(model, loader, criterion_l1, criterion_msssim, optimizer, de
 
             # Determine degradation type from filename
             # Assuming filenames contain 'rain' or 'snow'
-            degradation_types = ['rain' if 'rain' in filename else 'snow'
-                                 for filename in filenames]
+            degradation_types = []
+            for filename in filenames:
+                if 'rain' in filename:
+                    degradation_types.append('rain')
+                elif 'snow' in filename:
+                    degradation_types.append('snow')
+                else:
+                    raise ValueError(
+                        f"Invalid filename {filename}: must contain 'rain' or 'snow'")
 
             # Forward pass
             optimizer.zero_grad()
             outputs = []
             for i, img in enumerate(degraded):
                 # Process each image with its corresponding degradation type
+                # Passing as positional argument (model expects inp_img, noise_emb=None)
                 output = model(img.unsqueeze(0), degradation_types[i])
                 outputs.append(output)
             outputs = torch.cat(outputs)
@@ -82,12 +93,20 @@ def validate(model, loader, criterion_l1, criterion_msssim, device, args):
                 filenames = batch['filename']
 
                 # Determine degradation type from filename
-                degradation_types = ['rain' if 'rain' in filename else 'snow'
-                                     for filename in filenames]
+                degradation_types = []
+                for filename in filenames:
+                    if 'rain' in filename:
+                        degradation_types.append('rain')
+                    elif 'snow' in filename:
+                        degradation_types.append('snow')
+                    else:
+                        raise ValueError(
+                            f"Invalid filename {filename}: must contain 'rain' or 'snow'")
 
                 # Forward pass
                 outputs = []
                 for i, img in enumerate(degraded):
+                    # Passing as positional argument (model expects inp_img, noise_emb=None)
                     output = model(img.unsqueeze(0), degradation_types[i])
                     outputs.append(output)
                 outputs = torch.cat(outputs)
@@ -149,9 +168,26 @@ def main(args):
     print(f"Test: {len(test_loader.dataset)} images")
 
     # Create model
-    model = PromptIR(base_channels=args.base_channels,
-                     prompt_dim=args.prompt_dim,
-                     num_blocks=args.num_blocks)
+    # Convert num_blocks from int to list if it's an integer
+    if isinstance(args.num_blocks, int):
+        n = args.num_blocks
+        # Distribute blocks across 4 levels: [n//4, n//4, n//4, n-3*(n//4)]
+        blocks = [n//4, n//4, n//4, n-3*(n//4)]
+    else:
+        blocks = args.num_blocks
+
+    model = PromptIR(
+        inp_channels=3,
+        out_channels=3,
+        dim=args.base_channels,
+        num_blocks=blocks,
+        num_refinement_blocks=4,
+        heads=[1, 2, 4, 8],
+        ffn_expansion_factor=2.66,
+        bias=False,
+        LayerNorm_type='WithBias',
+        decoder=True  # Enable prompt functionality
+    )
     model = model.to(device)
 
     # Define loss and optimizer
@@ -219,32 +255,30 @@ if __name__ == "__main__":
 
     # Data arguments
     parser.add_argument('--data-dir', type=str,
-                        default='data', help='Path to data directory')
+                        default='data', help='Path to data directory containing rain and snow images')
     parser.add_argument('--output-dir', type=str,
-                        default='output', help='Output directory')
+                        default='output', help='Output directory for checkpoints and logs')
     parser.add_argument('--batch-size', type=int,
-                        default=8, help='Batch size')
+                        default=8, help='Batch size for training')
     parser.add_argument('--val-ratio', type=float,
-                        default=0.1, help='Validation ratio')
+                        default=0.1, help='Validation set ratio')
     parser.add_argument('--num-workers', type=int, default=4,
                         help='Number of workers for data loading')
 
     # Model arguments
     parser.add_argument('--base-channels', type=int,
-                        default=64, help='Base number of channels')
-    parser.add_argument('--prompt-dim', type=int,
-                        default=64, help='Prompt dimension')
+                        default=64, help='Base number of channels (dim) in the model')
     parser.add_argument('--num-blocks', type=int,
-                        default=9, help='Number of residual blocks in FeatureExtractor')
+                        default=9, help='Number of transformer blocks (will be distributed across 4 levels)')
 
     # Training arguments
     parser.add_argument('--epochs', type=int, default=100,
-                        help='Number of epochs')
+                        help='Number of training epochs')
     parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--loss-alpha', type=float, default=0.84,
-                        help='Alpha for L1 loss in combined L1+MS-SSIM loss')
+                        help='Weight for L1 loss in combined L1+MS-SSIM loss (1-alpha for MS-SSIM)')
     parser.add_argument('--resume', type=str, default=None,
-                        help='Resume from checkpoint')
+                        help='Path to checkpoint to resume training from')
 
     args = parser.parse_args()
 
