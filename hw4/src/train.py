@@ -196,7 +196,7 @@ def main(args):
         data_range=1.0, size_average=True, channel=3).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='max', factor=0.5, patience=5, verbose=True
+        optimizer, mode='max', factor=0.5, patience=5
     )
 
     # Load checkpoint if resuming
