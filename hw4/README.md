@@ -93,3 +93,7 @@ The model uses a unified approach where a single model can handle both rain and 
 ## Evaluation
 
 The model is evaluated using PSNR (Peak Signal-to-Noise Ratio) on the validation set during training. The test set predictions are saved in the required `pred.npz` format for submission. 
+
+## Sample Results
+
+![Sample Results](visualizations/sample_results.png)
