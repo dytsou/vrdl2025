@@ -31,6 +31,14 @@ This repository contains a collection of homework assignments for the Visual Rec
   - FastHOGAwareAttention mechanism
   - Combined L1 and MS-SSIM loss
 
+- **Final Project**: Sea Lion Population Counting
+  - YOLO11x-based automated counting system
+  - [NOAA Fisheries Steller Sea Lion Population Count Kaggle competition](https://www.kaggle.com/competitions/noaa-fisheries-steller-sea-lion-population-count)
+  - Adaptive bounding box annotation with IoU-based adjustment
+  - Advanced data augmentation and patch generation strategies
+  - Achieved 2nd place on Kaggle leaderboard (11.65312 RMSE)
+  - Real-world conservation application for endangered species monitoring
+
 ## Requirements
 
 - Python 3.8+ 
